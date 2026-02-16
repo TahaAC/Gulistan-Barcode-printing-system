@@ -404,9 +404,6 @@
             <span>Gulistan Barcode</span>
         </div>
         <div class="controls">
-            <button class="btn-primary" onclick="syncAllToFirebase()" id="sync-btn">
-                <i class="fa-solid fa-cloud-arrow-up"></i> Sync to Cloud
-            </button>
             <button class="btn-secondary" onclick="switchView('queue-view')">
                 <i class="fa-solid fa-print"></i> Print Queue <span id="queue-count" class="badge" style="margin-left:5px">0</span>
             </button>
@@ -5163,32 +5160,48 @@ OMO	9KG 1	$28.99
         renderTable();
         updateQueueUI();
     
-        // --- FIREBASE SYNC FUNCTION ---
-        let syncProgress = { total: 0, uploaded: 0 };
+        // --- AUTO FIREBASE SYNC ---
+        let syncInProgress = false;
         
-        async function syncAllToFirebase() {
-            const btn = document.getElementById('sync-btn');
+        async function autoSyncToFirebase() {
+            if (syncInProgress) return;
+            
             const productCount = Object.keys(inventory).length;
+            if (productCount === 0) return;
             
-            if (!confirm('This will upload ' + productCount + ' products to Firebase cloud storage.\n\nContinue?')) {
-                return;
-            }
-            
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Syncing...';
-            syncProgress = { total: productCount, uploaded: 0 };
+            syncInProgress = true;
+            console.log('Starting auto-sync of ' + productCount + ' products to Firebase...');
             
             const products = Object.values(inventory);
-            const batchSize = 50;
+            const batchSize = 100;
             let uploaded = 0;
             let failed = 0;
             
-            showToast('Starting sync of ' + productCount + ' products...');
+            // First, get existing products from Firebase to avoid unnecessary uploads
+            let existingBarcodes = new Set();
+            try {
+                const snapshot = await db.collection('products').get();
+                snapshot.forEach((doc) => {
+                    existingBarcodes.add(doc.id);
+                });
+                console.log('Found ' + existingBarcodes.size + ' existing products in Firebase');
+            } catch (e) {
+                console.log('Could not fetch existing products, will upload all');
+            }
             
-            for (let i = 0; i < products.length; i += batchSize) {
-                const batch = products.slice(i, i + batchSize);
-                const batchNum = Math.floor(i / batchSize) + 1;
-                const totalBatches = Math.ceil(products.length / batchSize);
+            // Filter to only products that don't exist in Firebase
+            const toUpload = products.filter(p => !existingBarcodes.has(p.barcode));
+            
+            if (toUpload.length === 0) {
+                console.log('All products already synced to Firebase');
+                syncInProgress = false;
+                return;
+            }
+            
+            console.log('Uploading ' + toUpload.length + ' new products...');
+            
+            for (let i = 0; i < toUpload.length; i += batchSize) {
+                const batch = toUpload.slice(i, i + batchSize);
                 
                 try {
                     const promises = batch.map(product => 
@@ -5197,21 +5210,24 @@ OMO	9KG 1	$28.99
                             name: product.name,
                             price: product.price,
                             updatedAt: new Date().toISOString()
+                        }).then(() => {
+                            uploaded++;
+                            return true;
                         }).catch(e => {
-                            console.error('Failed to upload:', product.barcode, e);
-                            return null;
+                            failed++;
+                            return false;
                         })
                     );
                     
-                    const results = await Promise.all(promises);
-                    const succeeded = results.filter(r => r !== null).length;
-                    uploaded += succeeded;
-                    failed += (batch.length - succeeded);
+                    await Promise.all(promises);
                     
-                    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + uploaded + '/' + productCount;
+                    // Log progress every 5 batches
+                    if (Math.floor(i / batchSize) % 5 === 0) {
+                        console.log('Sync progress: ' + uploaded + '/' + toUpload.length);
+                    }
                     
                     // Small delay between batches
-                    await new Promise(r => setTimeout(r, 100));
+                    await new Promise(r => setTimeout(r, 50));
                     
                 } catch (error) {
                     console.error('Batch error:', error);
@@ -5219,46 +5235,19 @@ OMO	9KG 1	$28.99
                 }
             }
             
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Sync to Cloud';
+            syncInProgress = false;
             
+            if (uploaded > 0) {
+                console.log('✅ Auto-sync complete: ' + uploaded + ' products uploaded to Firebase');
+                showToast(uploaded + ' products synced to cloud');
+            }
             if (failed > 0) {
-                showToast('Sync complete: ' + uploaded + ' uploaded, ' + failed + ' failed');
-            } else {
-                showToast('✅ All ' + uploaded + ' products synced to cloud!');
+                console.log('⚠️ Failed: ' + failed + ' products');
             }
         }
         
-        // Load products from Firebase on startup
-        async function loadAllFromFirebase() {
-            try {
-                const snapshot = await db.collection('products').get();
-                let loaded = 0;
-                
-                snapshot.forEach((doc) => {
-                    const data = doc.data();
-                    if (!inventory[data.barcode]) {
-                        inventory[data.barcode] = {
-                            barcode: data.barcode,
-                            name: data.name,
-                            price: data.price
-                        };
-                        loaded++;
-                    }
-                });
-                
-                if (loaded > 0) {
-                    renderTable();
-                    showToast('Loaded ' + loaded + ' additional products from cloud');
-                }
-                console.log('Firebase loaded: ' + loaded + ' new products');
-            } catch (error) {
-                console.error('Firebase load error:', error);
-            }
-        }
-        
-        // Call load after initial render
-        setTimeout(loadAllFromFirebase, 2000);
+        // Auto-sync after page loads and products are parsed
+        setTimeout(autoSyncToFirebase, 3000);
 
     </script>
 </body>
