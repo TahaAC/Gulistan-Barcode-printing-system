@@ -404,6 +404,9 @@
             <span>Gulistan Barcode</span>
         </div>
         <div class="controls">
+            <button class="btn-primary" onclick="syncAllToFirebase()" id="sync-btn">
+                <i class="fa-solid fa-cloud-arrow-up"></i> Sync to Cloud
+            </button>
             <button class="btn-secondary" onclick="switchView('queue-view')">
                 <i class="fa-solid fa-print"></i> Print Queue <span id="queue-count" class="badge" style="margin-left:5px">0</span>
             </button>
@@ -5159,6 +5162,104 @@ OMO	9KG 1	$28.99
         // Initial render with all products
         renderTable();
         updateQueueUI();
+    
+        // --- FIREBASE SYNC FUNCTION ---
+        let syncProgress = { total: 0, uploaded: 0 };
+        
+        async function syncAllToFirebase() {
+            const btn = document.getElementById('sync-btn');
+            const productCount = Object.keys(inventory).length;
+            
+            if (!confirm('This will upload ' + productCount + ' products to Firebase cloud storage.\n\nContinue?')) {
+                return;
+            }
+            
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Syncing...';
+            syncProgress = { total: productCount, uploaded: 0 };
+            
+            const products = Object.values(inventory);
+            const batchSize = 50;
+            let uploaded = 0;
+            let failed = 0;
+            
+            showToast('Starting sync of ' + productCount + ' products...');
+            
+            for (let i = 0; i < products.length; i += batchSize) {
+                const batch = products.slice(i, i + batchSize);
+                const batchNum = Math.floor(i / batchSize) + 1;
+                const totalBatches = Math.ceil(products.length / batchSize);
+                
+                try {
+                    const promises = batch.map(product => 
+                        db.collection('products').doc(product.barcode).set({
+                            barcode: product.barcode,
+                            name: product.name,
+                            price: product.price,
+                            updatedAt: new Date().toISOString()
+                        }).catch(e => {
+                            console.error('Failed to upload:', product.barcode, e);
+                            return null;
+                        })
+                    );
+                    
+                    const results = await Promise.all(promises);
+                    const succeeded = results.filter(r => r !== null).length;
+                    uploaded += succeeded;
+                    failed += (batch.length - succeeded);
+                    
+                    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + uploaded + '/' + productCount;
+                    
+                    // Small delay between batches
+                    await new Promise(r => setTimeout(r, 100));
+                    
+                } catch (error) {
+                    console.error('Batch error:', error);
+                    failed += batch.length;
+                }
+            }
+            
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Sync to Cloud';
+            
+            if (failed > 0) {
+                showToast('Sync complete: ' + uploaded + ' uploaded, ' + failed + ' failed');
+            } else {
+                showToast('✅ All ' + uploaded + ' products synced to cloud!');
+            }
+        }
+        
+        // Load products from Firebase on startup
+        async function loadAllFromFirebase() {
+            try {
+                const snapshot = await db.collection('products').get();
+                let loaded = 0;
+                
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    if (!inventory[data.barcode]) {
+                        inventory[data.barcode] = {
+                            barcode: data.barcode,
+                            name: data.name,
+                            price: data.price
+                        };
+                        loaded++;
+                    }
+                });
+                
+                if (loaded > 0) {
+                    renderTable();
+                    showToast('Loaded ' + loaded + ' additional products from cloud');
+                }
+                console.log('Firebase loaded: ' + loaded + ' new products');
+            } catch (error) {
+                console.error('Firebase load error:', error);
+            }
+        }
+        
+        // Call load after initial render
+        setTimeout(loadAllFromFirebase, 2000);
+
     </script>
 </body>
 </html>
