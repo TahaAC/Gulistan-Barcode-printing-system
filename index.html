@@ -169,7 +169,7 @@
                 <h3><i class="fa-solid fa-list-check"></i> Print Queue</h3>
                 <div style="display:flex;gap:0.5rem;">
                     <button class="btn-secondary" onclick="switchView('inventory-view')"><i class="fa-solid fa-arrow-left"></i> Back</button>
-                    <button class="btn-danger" onclick="clearQueue()"><i class="fa-solid fa-trash"></i></button>
+                    <button class="btn-danger" onclick="clearQueue()"><i class="fa-solid fa-trash"></i> Clear</button>
                 </div>
             </div>
             <div class="table-container">
@@ -178,9 +178,10 @@
                     <tbody id="queue-list"></tbody>
                 </table>
             </div>
-            <div class="card" style="display:flex;gap:0.5rem;">
-                <button class="btn-primary" onclick="printLabels()" style="flex:1;"><i class="fa-solid fa-barcode"></i> Print Labels</button>
-                <button class="btn-secondary" onclick="printList()" style="flex:1;"><i class="fa-solid fa-list"></i> Print List</button>
+            <div class="card" style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                <button class="btn-primary" onclick="printDirect()" style="flex:1;min-width:140px;"><i class="fa-solid fa-print"></i> Print Direct</button>
+                <button class="btn-secondary" onclick="printLabels()" style="flex:1;min-width:140px;"><i class="fa-solid fa-barcode"></i> Preview Labels</button>
+                <button class="btn-secondary" onclick="printList()" style="flex:1;min-width:140px;"><i class="fa-solid fa-list"></i> Print List</button>
             </div>
         </div>
     </main>
@@ -4034,6 +4035,28 @@ OMO 9KG 1       $28.99
         let html5QrCode = null;
         const perPage = 100;
 
+        // Queue localStorage functions
+        function saveQueueToStorage() {
+            try {
+                localStorage.setItem('gulistan_printQueue', JSON.stringify(printQueue));
+            } catch(e) {
+                console.log('Could not save queue to localStorage');
+            }
+        }
+
+        function loadQueueFromStorage() {
+            try {
+                const saved = localStorage.getItem('gulistan_printQueue');
+                if (saved) {
+                    printQueue = JSON.parse(saved);
+                    console.log('Loaded queue from storage:', Object.keys(printQueue).length, 'items');
+                }
+            } catch(e) {
+                console.log('Could not load queue from localStorage');
+                printQueue = {};
+            }
+        }
+
         // Parse line
         function parseLine(line) {
             const parts = line.trim().split(/\t+|\s{2,}/);
@@ -4157,6 +4180,7 @@ OMO 9KG 1       $28.99
                     <td><button class="btn-danger" onclick="delQueue('${code}')" style="padding:0.25rem"><i class="fa-solid fa-trash"></i></button></td></tr>`;
             });
             document.getElementById('queue-count').textContent = total;
+            saveQueueToStorage(); // Save to localStorage whenever queue updates
         }
 
         function chgQty(code, d) {
@@ -4168,7 +4192,15 @@ OMO 9KG 1       $28.99
         }
 
         function delQueue(code) { delete printQueue[code]; updateQueue(); toast('Removed'); }
-        function clearQueue() { if (confirm('Clear all?')) { printQueue = {}; updateQueue(); toast('Cleared'); } }
+        
+        function clearQueue() { 
+            if (confirm('Clear all items from queue?')) { 
+                printQueue = {}; 
+                localStorage.removeItem('gulistan_printQueue');
+                updateQueue(); 
+                toast('Queue cleared'); 
+            } 
+        }
 
         // View switch
         function switchView(id) {
@@ -4401,7 +4433,69 @@ OMO 9KG 1       $28.99
             startCamera();
         }
 
-        // Print
+        // Print - Direct to printer without preview
+        function printDirect() {
+            const items = Object.values(printQueue);
+            if (!items.length) { toast('Queue empty'); return; }
+            
+            // Create hidden iframe for printing
+            let printFrame = document.getElementById('print-frame');
+            if (!printFrame) {
+                printFrame = document.createElement('iframe');
+                printFrame.id = 'print-frame';
+                printFrame.style.position = 'absolute';
+                printFrame.style.top = '-10000px';
+                printFrame.style.left = '-10000px';
+                document.body.appendChild(printFrame);
+            }
+            
+            const doc = printFrame.contentWindow.document;
+            
+            let html = `<!DOCTYPE html>
+<html><head><title>Print Labels</title>
+<style>
+@page { size: A4; margin: 5mm; }
+body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+.labels-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2mm; padding: 0; }
+.label { border: 1px solid #ccc; padding: 3mm; text-align: center; page-break-inside: avoid; height: 32mm; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+.barcode-img { margin: 0; }
+.barcode-number { font-size: 8pt; font-family: 'Courier New', monospace; color: #333; margin-top: 1mm; }
+.name { font-size: 9pt; font-weight: bold; margin: 1mm 0; color: #333; max-width: 60mm; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.price { font-size: 16pt; font-weight: bold; color: #2563eb; margin-top: 1mm; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
+</head><body>
+<div class="labels-grid">`;
+            
+            let bcIndex = 0;
+            const barcodeData = [];
+            items.forEach(item => {
+                for (let i = 0; i < item.qty; i++) {
+                    html += `<div class="label">
+                        <svg id="bc${bcIndex}" class="barcode-img"></svg>
+                        <div class="barcode-number">${item.barcode}</div>
+                        <div class="name">${item.name}</div>
+                        <div class="price">$${item.price.toFixed(2)}</div>
+                    </div>`;
+                    barcodeData.push({ id: bcIndex, barcode: item.barcode });
+                    bcIndex++;
+                }
+            });
+            
+            html += '</div><script>';
+            barcodeData.forEach(bd => {
+                html += `JsBarcode("#bc${bd.id}","${bd.barcode}",{width:1.2,height:25,displayValue:false,margin:2});`;
+            });
+            html += 'setTimeout(()=>{window.print();},300);<\/script></body></html>';
+            
+            doc.open();
+            doc.write(html);
+            doc.close();
+            
+            toast('Sending to printer...');
+        }
+
+        // Print - Preview with back button
         function printLabels() {
             const items = Object.values(printQueue);
             if (!items.length) { toast('Queue empty'); return; }
@@ -4508,6 +4602,7 @@ body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
         // Init
         document.addEventListener('DOMContentLoaded', () => {
             loadProducts();
+            loadQueueFromStorage(); // Load saved queue from localStorage
             render();
             updateQueue();
             setTimeout(syncFirebase, 3000);
