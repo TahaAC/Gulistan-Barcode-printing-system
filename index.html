@@ -423,6 +423,12 @@
                     <i class="fa-solid fa-qrcode"></i> Scan
                 </button>
             </div>
+            
+            <!-- Product Count Display -->
+            <div id="product-count" style="background: var(--surface); padding: 0.5rem 1rem; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center;">
+                <span><i class="fa-solid fa-box"></i> <strong id="total-products">0</strong> products loaded</span>
+                <span style="color: var(--secondary); font-size: 0.9rem;">Showing <strong id="showing-products">0</strong> products</span>
+            </div>
 
             <!-- New Product Form -->
             <div style="background: var(--surface); padding: 1rem; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
@@ -792,6 +798,16 @@
         });
 
         // --- 3. KEY UI FUNCTIONS ---
+        let currentPage = 1;
+        const productsPerPage = 200;
+        
+        function updateProductCount(total, showing) {
+            const totalEl = document.getElementById('total-products');
+            const showingEl = document.getElementById('showing-products');
+            if (totalEl) totalEl.textContent = total;
+            if (showingEl) showingEl.textContent = showing;
+        }
+        
         function renderTable() {
             const tbody = document.getElementById('product-list');
             if (!tbody) return;
@@ -800,11 +816,22 @@
             
             if (filteredProducts.length === 0) {
                 document.getElementById('no-results').style.display = 'block';
+                document.getElementById('show-more-container')?.remove();
+                updateProductCount(0, 0);
                 return;
             }
             
             document.getElementById('no-results').style.display = 'none';
-            filteredProducts.forEach((product, index) => {
+            
+            // Only show products for current page
+            const startIndex = 0;
+            const endIndex = currentPage * productsPerPage;
+            const productsToShow = filteredProducts.slice(startIndex, endIndex);
+            
+            // Update count display
+            updateProductCount(filteredProducts.length, productsToShow.length);
+            
+            productsToShow.forEach((product, index) => {
                 const row = document.createElement('tr');
                 const btnId = 'add-btn-' + index;
                 const editBtnId = 'edit-btn-' + index;
@@ -817,6 +844,23 @@
                     openEditProductModal(this.dataset.barcode);
                 });
             });
+            
+            // Add "Show More" button if there are more products
+            const existingContainer = document.getElementById('show-more-container');
+            if (existingContainer) existingContainer.remove();
+            
+            if (filteredProducts.length > endIndex) {
+                const container = document.createElement('div');
+                container.id = 'show-more-container';
+                container.style.cssText = 'text-align: center; padding: 1rem;';
+                container.innerHTML = '<button class="btn-primary" onclick="showMoreProducts()" style="min-width: 200px;">Show More (' + (filteredProducts.length - endIndex) + ' remaining)</button>';
+                tbody.parentElement.appendChild(container);
+            }
+        }
+        
+        function showMoreProducts() {
+            currentPage++;
+            renderTable();
         }
 
         function updateQueueUI() {
@@ -893,10 +937,18 @@
         }
 
         function handleSearch() {
+            currentPage = 1; // Reset pagination
             const query = document.getElementById('search-input').value.toLowerCase();
             const tbody = document.getElementById('product-list');
             if (!tbody) return;
             tbody.innerHTML = '';
+            document.getElementById('show-more-container')?.remove();
+            
+            if (!query) {
+                // If search is empty, show paginated view
+                renderTable();
+                return;
+            }
             
             const filtered = Object.values(inventory).filter(p => 
                 p.barcode.toLowerCase().includes(query) || 
@@ -905,11 +957,20 @@
             
             if (filtered.length === 0) {
                 document.getElementById('no-results').style.display = 'block';
+                updateProductCount(Object.keys(inventory).length, 0);
                 return;
             }
             
             document.getElementById('no-results').style.display = 'none';
-            filtered.forEach((product, index) => {
+            
+            // Limit search results for performance
+            const maxResults = 500;
+            const resultsToShow = filtered.slice(0, maxResults);
+            
+            // Update count display for search
+            updateProductCount(Object.keys(inventory).length, resultsToShow.length);
+            
+            resultsToShow.forEach((product, index) => {
                 const row = document.createElement('tr');
                 const btnId = 'search-add-btn-' + index;
                 row.innerHTML = '<td>' + product.barcode + '</td><td>' + product.name + '</td><td class="price-tag">$' + product.price.toFixed(2) + '</td><td><button id="' + btnId + '" class="btn-secondary" data-barcode="' + product.barcode + '" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;"><i class="fa-solid fa-plus"></i> Add</button></td>';
@@ -918,6 +979,15 @@
                     addToQueue(this.dataset.barcode);
                 });
             });
+            
+            // Show count
+            if (filtered.length > maxResults) {
+                const container = document.createElement('div');
+                container.id = 'show-more-container';
+                container.style.cssText = 'text-align: center; padding: 1rem; color: var(--secondary);';
+                container.innerHTML = 'Showing ' + maxResults + ' of ' + filtered.length + ' results. Refine your search for more specific results.';
+                tbody.parentElement.appendChild(container);
+            }
         }
 
         function clearQueue() {
