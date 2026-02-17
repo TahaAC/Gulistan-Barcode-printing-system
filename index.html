@@ -759,23 +759,29 @@
         // --- LOCALSTORAGE FUNCTIONS ---
         function savePrintQueueToLocalStorage() {
             try {
-                localStorage.setItem('printQueue', JSON.stringify(printQueue));
-                console.log('Queue saved to localStorage');
+                if (typeof localStorage !== 'undefined') {
+                    localStorage.setItem('printQueue', JSON.stringify(printQueue));
+                    console.log('Queue saved to localStorage');
+                }
             } catch (error) {
-                console.error('Failed to save queue:', error);
+                // localStorage blocked by browser - queue will not persist
+                console.log('localStorage not available - queue will not persist between sessions');
             }
         }
 
         function loadPrintQueueFromLocalStorage() {
             try {
-                const saved = localStorage.getItem('printQueue');
-                if (saved) {
-                    printQueue = JSON.parse(saved);
-                    updateQueueUI();
-                    console.log('Queue loaded from localStorage');
+                if (typeof localStorage !== 'undefined') {
+                    const saved = localStorage.getItem('printQueue');
+                    if (saved) {
+                        printQueue = JSON.parse(saved);
+                        updateQueueUI();
+                        console.log('Queue loaded from localStorage');
+                    }
                 }
             } catch (error) {
-                console.error('Failed to load queue:', error);
+                // localStorage blocked by browser - start with empty queue
+                console.log('localStorage not available - starting with empty queue');
                 printQueue = {};
             }
         }
