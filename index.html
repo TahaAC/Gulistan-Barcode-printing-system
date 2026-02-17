@@ -4,14 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Gulistan Barcode">
     <meta name="theme-color" content="#2563eb">
     <title>Gulistan Barcode - Smart Inventory System</title>
     
     <!-- Favicon -->
-    <link rel="icon" type="image/png" href="logo.png">
-    <link rel="apple-touch-icon" href="logo.png">
+    <link rel="icon" type="image/png" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCBmaWxsPSIjMjU2M2ViIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjEwIi8+PHRleHQgeD0iNTAiIHk9IjY1IiBmb250LXNpemU9IjUwIiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXdlaWdodD0iYm9sZCI+RzwvdGV4dD48L3N2Zz4=">
+    <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCBmaWxsPSIjMjU2M2ViIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjEwIi8+PHRleHQgeD0iNTAiIHk9IjY1IiBmb250LXNpemU9IjUwIiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXdlaWdodD0iYm9sZCI+RzwvdGV4dD48L3N2Zz4=">
     
     <!-- Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -400,7 +401,7 @@
     <!-- Header -->
     <header>
         <div class="brand">
-            <img src="logo.png" alt="Gulistan Logo" class="logo-img">
+            <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCBmaWxsPSIjMjU2M2ViIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjEwIi8+PHRleHQgeD0iNTAiIHk9IjY1IiBmb250LXNpemU9IjUwIiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXdlaWdodD0iYm9sZCI+RzwvdGV4dD48L3N2Zz4=" alt="Gulistan Logo" class="logo-img">
             <span>Gulistan Barcode</span>
         </div>
         <div class="controls">
@@ -5092,7 +5093,6 @@ OMO	9KG 1	$28.99
             let cleanBarcode = barcode.trim().replace(/[^0-9A-Za-z]/g, '');
             
             console.log('Scanned barcode:', barcode, '-> Cleaned:', cleanBarcode);
-            console.log('Inventory has', Object.keys(inventory).length, 'products');
             
             // Try exact match first
             let product = inventory[cleanBarcode];
@@ -5103,38 +5103,48 @@ OMO	9KG 1	$28.99
                 cleanBarcode = barcode;
             }
             
-            // If still not found, try partial match (barcode contains or is contained)
+            // If still not found, try partial match
             if (!product) {
                 for (let key in inventory) {
                     if (key.includes(cleanBarcode) || cleanBarcode.includes(key)) {
                         product = inventory[key];
                         cleanBarcode = key;
-                        console.log('Found partial match:', key);
                         break;
                     }
                 }
             }
             
-            // If still not found, try matching last digits (common with UPC/EAN)
+            // If still not found, try matching last digits
             if (!product && cleanBarcode.length > 5) {
                 const lastDigits = cleanBarcode.slice(-6);
-                const firstDigits = cleanBarcode.slice(0, 6);
                 for (let key in inventory) {
-                    if (key.endsWith(lastDigits) || key.startsWith(firstDigits)) {
+                    if (key.endsWith(lastDigits)) {
                         product = inventory[key];
                         cleanBarcode = key;
-                        console.log('Found digit match:', key);
                         break;
                     }
                 }
             }
             
-            // Check if product exists in inventory
+            // Check if product exists
             if (product) {
-                // Product found - show immediately
                 document.getElementById('scan-barcode').value = cleanBarcode;
                 document.getElementById('found-name').value = product.name;
-                document.getElementById('found-price').value = '
+                document.getElementById('found-price').value = '$' + product.price.toFixed(2);
+                document.getElementById('found-product').style.display = 'block';
+                document.getElementById('new-product-form').style.display = 'none';
+                showToast('Found: ' + product.name);
+            } else {
+                document.getElementById('scan-barcode').value = cleanBarcode;
+                document.getElementById('found-product').style.display = 'none';
+                document.getElementById('new-product-form').style.display = 'block';
+                document.getElementById('new-barcode').value = cleanBarcode;
+                document.getElementById('new-name').value = '';
+                document.getElementById('new-price').value = '';
+                showToast('Product not found - Register below');
+                document.getElementById('new-name').focus();
+            }
+        }
 
         function addToQueueFromScan(barcode) {
             addToQueue(barcode);
