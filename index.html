@@ -144,8 +144,11 @@
 
             <div class="card">
                 <h3 style="margin-bottom:0.75rem;color:var(--primary);"><i class="fa-solid fa-plus-circle"></i> Quick Add</h3>
-                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:0.5rem;">
-                    <input type="text" id="new-barcode" placeholder="Barcode" style="padding:0.6rem;border:2px solid var(--border);border-radius:8px;">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:0.5rem;">
+                    <div style="display:flex;gap:0.25rem;">
+                        <input type="text" id="new-barcode" placeholder="Barcode" style="flex:1;padding:0.6rem;border:2px solid var(--border);border-radius:8px;">
+                        <button class="btn-secondary" onclick="openScannerForNewProduct()" style="padding:0.6rem;border-radius:8px;"><i class="fa-solid fa-qrcode"></i></button>
+                    </div>
                     <input type="text" id="new-name" placeholder="Name" style="padding:0.6rem;border:2px solid var(--border);border-radius:8px;">
                     <input type="number" id="new-price" placeholder="Price" step="0.01" style="padding:0.6rem;border:2px solid var(--border);border-radius:8px;">
                     <button class="btn-primary" onclick="addNewProduct()"><i class="fa-solid fa-plus"></i> Add</button>
@@ -4246,9 +4249,20 @@ OMO 9KG 1       $28.99
         }
 
         // Scanner
+        let scannerMode = 'search'; // 'search' or 'new-product'
+        
         function openScanner() {
+            scannerMode = 'search';
             document.getElementById('scanner-modal').classList.add('active');
             document.getElementById('scan-result').innerHTML = '';
+            document.getElementById('manual-barcode').value = '';
+            startCamera();
+        }
+        
+        function openScannerForNewProduct() {
+            scannerMode = 'new-product';
+            document.getElementById('scanner-modal').classList.add('active');
+            document.getElementById('scan-result').innerHTML = '<div style="text-align:center;padding:1rem;color:var(--primary);"><i class="fa-solid fa-qrcode" style="font-size:2rem;margin-bottom:0.5rem;"></i><p>Scan barcode for new product</p></div>';
             document.getElementById('manual-barcode').value = '';
             startCamera();
         }
@@ -4256,6 +4270,7 @@ OMO 9KG 1       $28.99
         function closeScanner() {
             stopCamera();
             document.getElementById('scanner-modal').classList.remove('active');
+            scannerMode = 'search';
         }
 
         function startCamera() {
@@ -4282,7 +4297,15 @@ OMO 9KG 1       $28.99
                     // Success - barcode found instantly
                     html5QrCode.stop().then(() => {
                         document.getElementById('scanning-status').style.display = 'none';
-                        handleBarcode(decodedText);
+                        if (scannerMode === 'new-product') {
+                            // Fill the barcode field for new product
+                            document.getElementById('new-barcode').value = decodedText.trim();
+                            closeScanner();
+                            document.getElementById('new-name').focus();
+                            toast('Barcode scanned - enter name and price');
+                        } else {
+                            handleBarcode(decodedText);
+                        }
                     }).catch(err => console.log('Stop error:', err));
                 },
                 (errorMessage) => {
@@ -4305,7 +4328,16 @@ OMO 9KG 1       $28.99
 
         function handleManualScan() {
             const barcode = document.getElementById('manual-barcode').value.trim();
-            if (barcode) handleBarcode(barcode);
+            if (barcode) {
+                if (scannerMode === 'new-product') {
+                    document.getElementById('new-barcode').value = barcode;
+                    closeScanner();
+                    document.getElementById('new-name').focus();
+                    toast('Barcode entered - enter name and price');
+                } else {
+                    handleBarcode(barcode);
+                }
+            }
         }
 
         function handleBarcode(barcode) {
