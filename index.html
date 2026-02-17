@@ -5088,31 +5088,818 @@ OMO	9KG 1	$28.99
             document.getElementById('camera-view').style.display = 'none';
             document.getElementById('scan-result-area').style.display = 'block';
             
+            // Clean the barcode - remove extra spaces, special chars
+            let cleanBarcode = barcode.trim().replace(/[^0-9A-Za-z]/g, '');
+            
+            console.log('Scanned barcode:', barcode, '-> Cleaned:', cleanBarcode);
+            console.log('Inventory has', Object.keys(inventory).length, 'products');
+            
+            // Try exact match first
+            let product = inventory[cleanBarcode];
+            
+            // If not found, try with original barcode
+            if (!product && inventory[barcode]) {
+                product = inventory[barcode];
+                cleanBarcode = barcode;
+            }
+            
+            // If still not found, try partial match (barcode contains or is contained)
+            if (!product) {
+                for (let key in inventory) {
+                    if (key.includes(cleanBarcode) || cleanBarcode.includes(key)) {
+                        product = inventory[key];
+                        cleanBarcode = key;
+                        console.log('Found partial match:', key);
+                        break;
+                    }
+                }
+            }
+            
+            // If still not found, try matching last digits (common with UPC/EAN)
+            if (!product && cleanBarcode.length > 5) {
+                const lastDigits = cleanBarcode.slice(-6);
+                const firstDigits = cleanBarcode.slice(0, 6);
+                for (let key in inventory) {
+                    if (key.endsWith(lastDigits) || key.startsWith(firstDigits)) {
+                        product = inventory[key];
+                        cleanBarcode = key;
+                        console.log('Found digit match:', key);
+                        break;
+                    }
+                }
+            }
+            
             // Check if product exists in inventory
-            if (inventory[barcode]) {
-                // Product found
-                const product = inventory[barcode];
-                document.getElementById('scan-barcode').value = barcode;
+            if (product) {
+                // Product found - show immediately
+                document.getElementById('scan-barcode').value = cleanBarcode;
                 document.getElementById('found-name').value = product.name;
-                document.getElementById('found-price').value = '$' + product.price.toFixed(2);
+                document.getElementById('found-price').value = '
+
+        function addToQueueFromScan(barcode) {
+            addToQueue(barcode);
+            resetScanner();
+        }
+
+        function saveNewProduct() {
+            const barcode = document.getElementById('scan-barcode').value;
+            const name = document.getElementById('new-name').value.trim();
+            const priceStr = document.getElementById('new-price').value.trim();
+            
+            if (!name || !priceStr) {
+                alert('Please fill in all fields');
+                return;
+            }
+            
+            const price = parseFloat(priceStr.replace('$', ''));
+            if (isNaN(price)) {
+                alert('Invalid price');
+                return;
+            }
+            
+            const product = { barcode, name, price };
+            inventory[barcode] = product;
+            addToQueue(barcode);
+            renderTable();
+            resetScanner();
+            showToast('Added new product: ' + name);
+        }
+        
+        // Parse all products from rawTextData
+        console.log('Starting to parse products from rawTextData...');
+        const lines = rawTextData.trim().split('\n');
+        let parsedCount = 0;
+        lines.forEach(line => {
+            const product = parseProductLine(line);
+            if (product) {
+                inventory[product.barcode] = product;
+                parsedCount++;
+            }
+        });
+        console.log('Loaded ' + parsedCount + ' products into inventory. Total inventory items:', Object.keys(inventory).length);
+        
+        // Debug: Show first 5 products loaded
+        console.log('Sample products loaded:');
+        Object.entries(inventory).slice(0, 5).forEach(([code, prod]) => {
+            console.log('  ' + code + ': ' + prod.name + ' - 
+        
+        // Initial render with all products
+        renderTable();
+        updateQueueUI();
+    
+        // --- AUTO FIREBASE SYNC ---
+        let syncInProgress = false;
+        
+        async function autoSyncToFirebase() {
+            if (syncInProgress) return;
+            
+            const productCount = Object.keys(inventory).length;
+            if (productCount === 0) return;
+            
+            syncInProgress = true;
+            console.log('Starting auto-sync of ' + productCount + ' products to Firebase...');
+            
+            const products = Object.values(inventory);
+            const batchSize = 100;
+            let uploaded = 0;
+            let failed = 0;
+            
+            // First, get existing products from Firebase to avoid unnecessary uploads
+            let existingBarcodes = new Set();
+            try {
+                const snapshot = await db.collection('products').get();
+                snapshot.forEach((doc) => {
+                    existingBarcodes.add(doc.id);
+                });
+                console.log('Found ' + existingBarcodes.size + ' existing products in Firebase');
+            } catch (e) {
+                console.log('Could not fetch existing products, will upload all');
+            }
+            
+            // Filter to only products that don't exist in Firebase
+            const toUpload = products.filter(p => !existingBarcodes.has(p.barcode));
+            
+            if (toUpload.length === 0) {
+                console.log('All products already synced to Firebase');
+                syncInProgress = false;
+                return;
+            }
+            
+            console.log('Uploading ' + toUpload.length + ' new products...');
+            
+            for (let i = 0; i < toUpload.length; i += batchSize) {
+                const batch = toUpload.slice(i, i + batchSize);
+                
+                try {
+                    const promises = batch.map(product => 
+                        db.collection('products').doc(product.barcode).set({
+                            barcode: product.barcode,
+                            name: product.name,
+                            price: product.price,
+                            updatedAt: new Date().toISOString()
+                        }).then(() => {
+                            uploaded++;
+                            return true;
+                        }).catch(e => {
+                            failed++;
+                            return false;
+                        })
+                    );
+                    
+                    await Promise.all(promises);
+                    
+                    // Log progress every 5 batches
+                    if (Math.floor(i / batchSize) % 5 === 0) {
+                        console.log('Sync progress: ' + uploaded + '/' + toUpload.length);
+                    }
+                    
+                    // Small delay between batches
+                    await new Promise(r => setTimeout(r, 50));
+                    
+                } catch (error) {
+                    console.error('Batch error:', error);
+                    failed += batch.length;
+                }
+            }
+            
+            syncInProgress = false;
+            
+            if (uploaded > 0) {
+                console.log('✅ Auto-sync complete: ' + uploaded + ' products uploaded to Firebase');
+                showToast(uploaded + ' products synced to cloud');
+            }
+            if (failed > 0) {
+                console.log('⚠️ Failed: ' + failed + ' products');
+            }
+        }
+        
+        // Auto-sync after page loads and products are parsed
+        setTimeout(autoSyncToFirebase, 3000);
+
+    </script>
+</body>
+</html> + product.price.toFixed(2);
                 document.getElementById('found-product').style.display = 'block';
                 document.getElementById('new-product-form').style.display = 'none';
-                showToast('Found: ' + product.name);
+                showToast('✅ Found: ' + product.name);
+                console.log('Product found:', product);
             } else {
-                // Product not found - show register popup
-                document.getElementById('scan-barcode').value = barcode;
-                document.getElementById('found-product').style.display = 'none';
-                document.getElementById('new-product-form').style.display = 'block';
+                // Product not found - try to find similar products
+                const similarProducts = findSimilarProducts(cleanBarcode);
                 
-                // Show popup message
-                alert('Product not registered!\n\nBarcode: ' + barcode + '\n\nPlease register this product to continue.');
-                
-                // Auto-fill form with barcode for easy registration
-                document.getElementById('new-barcode').value = barcode;
-                document.getElementById('new-name').value = '';
-                document.getElementById('new-price').value = '';
-                document.getElementById('new-name').focus();
+                if (similarProducts.length > 0) {
+                    // Show similar products
+                    const product = similarProducts[0];
+                    document.getElementById('scan-barcode').value = product.barcode;
+                    document.getElementById('found-name').value = product.name + ' (Similar match)';
+                    document.getElementById('found-price').value = '
+
+        function addToQueueFromScan(barcode) {
+            addToQueue(barcode);
+            resetScanner();
+        }
+
+        function saveNewProduct() {
+            const barcode = document.getElementById('scan-barcode').value;
+            const name = document.getElementById('new-name').value.trim();
+            const priceStr = document.getElementById('new-price').value.trim();
+            
+            if (!name || !priceStr) {
+                alert('Please fill in all fields');
+                return;
             }
+            
+            const price = parseFloat(priceStr.replace('$', ''));
+            if (isNaN(price)) {
+                alert('Invalid price');
+                return;
+            }
+            
+            const product = { barcode, name, price };
+            inventory[barcode] = product;
+            addToQueue(barcode);
+            renderTable();
+            resetScanner();
+            showToast('Added new product: ' + name);
+        }
+        
+        // Parse all products from rawTextData
+        const lines = rawTextData.trim().split('\n');
+        let parsedCount = 0;
+        lines.forEach(line => {
+            const product = parseProductLine(line);
+            if (product) {
+                inventory[product.barcode] = product;
+                parsedCount++;
+            }
+        });
+        console.log('Loaded ' + parsedCount + ' products into inventory. Total inventory items:', Object.keys(inventory).length);
+        
+        // Initial render with all products
+        renderTable();
+        updateQueueUI();
+    
+        // --- AUTO FIREBASE SYNC ---
+        let syncInProgress = false;
+        
+        async function autoSyncToFirebase() {
+            if (syncInProgress) return;
+            
+            const productCount = Object.keys(inventory).length;
+            if (productCount === 0) return;
+            
+            syncInProgress = true;
+            console.log('Starting auto-sync of ' + productCount + ' products to Firebase...');
+            
+            const products = Object.values(inventory);
+            const batchSize = 100;
+            let uploaded = 0;
+            let failed = 0;
+            
+            // First, get existing products from Firebase to avoid unnecessary uploads
+            let existingBarcodes = new Set();
+            try {
+                const snapshot = await db.collection('products').get();
+                snapshot.forEach((doc) => {
+                    existingBarcodes.add(doc.id);
+                });
+                console.log('Found ' + existingBarcodes.size + ' existing products in Firebase');
+            } catch (e) {
+                console.log('Could not fetch existing products, will upload all');
+            }
+            
+            // Filter to only products that don't exist in Firebase
+            const toUpload = products.filter(p => !existingBarcodes.has(p.barcode));
+            
+            if (toUpload.length === 0) {
+                console.log('All products already synced to Firebase');
+                syncInProgress = false;
+                return;
+            }
+            
+            console.log('Uploading ' + toUpload.length + ' new products...');
+            
+            for (let i = 0; i < toUpload.length; i += batchSize) {
+                const batch = toUpload.slice(i, i + batchSize);
+                
+                try {
+                    const promises = batch.map(product => 
+                        db.collection('products').doc(product.barcode).set({
+                            barcode: product.barcode,
+                            name: product.name,
+                            price: product.price,
+                            updatedAt: new Date().toISOString()
+                        }).then(() => {
+                            uploaded++;
+                            return true;
+                        }).catch(e => {
+                            failed++;
+                            return false;
+                        })
+                    );
+                    
+                    await Promise.all(promises);
+                    
+                    // Log progress every 5 batches
+                    if (Math.floor(i / batchSize) % 5 === 0) {
+                        console.log('Sync progress: ' + uploaded + '/' + toUpload.length);
+                    }
+                    
+                    // Small delay between batches
+                    await new Promise(r => setTimeout(r, 50));
+                    
+                } catch (error) {
+                    console.error('Batch error:', error);
+                    failed += batch.length;
+                }
+            }
+            
+            syncInProgress = false;
+            
+            if (uploaded > 0) {
+                console.log('✅ Auto-sync complete: ' + uploaded + ' products uploaded to Firebase');
+                showToast(uploaded + ' products synced to cloud');
+            }
+            if (failed > 0) {
+                console.log('⚠️ Failed: ' + failed + ' products');
+            }
+        }
+        
+        // Auto-sync after page loads and products are parsed
+        setTimeout(autoSyncToFirebase, 3000);
+
+    </script>
+</body>
+</html> + product.price.toFixed(2);
+                    document.getElementById('found-product').style.display = 'block';
+                    document.getElementById('new-product-form').style.display = 'none';
+                    showToast('Found similar: ' + product.name);
+                    console.log('Found similar product:', product);
+                } else {
+                    // No match at all - show register form
+                    document.getElementById('scan-barcode').value = cleanBarcode;
+                    document.getElementById('found-product').style.display = 'none';
+                    document.getElementById('new-product-form').style.display = 'block';
+                    
+                    // Auto-fill form with barcode for easy registration
+                    document.getElementById('new-barcode').value = cleanBarcode;
+                    document.getElementById('new-name').value = '';
+                    document.getElementById('new-price').value = '';
+                    showToast('⚠️ Product not found - Register below');
+                    document.getElementById('new-name').focus();
+                }
+            }
+        }
+        
+        // Find similar products by name or barcode
+        function findSimilarProducts(barcode) {
+            const results = [];
+            const barcodeLower = barcode.toLowerCase();
+            
+            for (let key in inventory) {
+                const product = inventory[key];
+                const nameLower = (product.name || '').toLowerCase();
+                
+                // Check if barcode or name contains the scanned value
+                if (key.toLowerCase().includes(barcodeLower) || 
+                    barcodeLower.includes(key.toLowerCase()) ||
+                    nameLower.includes(barcodeLower)) {
+                    results.push({ ...product, barcode: key });
+                }
+                
+                if (results.length >= 5) break; // Limit to 5 results
+            }
+            
+            return results;
+        }
+
+        function addToQueueFromScan(barcode) {
+            addToQueue(barcode);
+            resetScanner();
+        }
+
+        function saveNewProduct() {
+            const barcode = document.getElementById('scan-barcode').value;
+            const name = document.getElementById('new-name').value.trim();
+            const priceStr = document.getElementById('new-price').value.trim();
+            
+            if (!name || !priceStr) {
+                alert('Please fill in all fields');
+                return;
+            }
+            
+            const price = parseFloat(priceStr.replace('$', ''));
+            if (isNaN(price)) {
+                alert('Invalid price');
+                return;
+            }
+            
+            const product = { barcode, name, price };
+            inventory[barcode] = product;
+            addToQueue(barcode);
+            renderTable();
+            resetScanner();
+            showToast('Added new product: ' + name);
+        }
+        
+        // Parse all products from rawTextData
+        const lines = rawTextData.trim().split('\n');
+        let parsedCount = 0;
+        lines.forEach(line => {
+            const product = parseProductLine(line);
+            if (product) {
+                inventory[product.barcode] = product;
+                parsedCount++;
+            }
+        });
+        console.log('Loaded ' + parsedCount + ' products into inventory. Total inventory items:', Object.keys(inventory).length);
+        
+        // Initial render with all products
+        renderTable();
+        updateQueueUI();
+    
+        // --- AUTO FIREBASE SYNC ---
+        let syncInProgress = false;
+        
+        async function autoSyncToFirebase() {
+            if (syncInProgress) return;
+            
+            const productCount = Object.keys(inventory).length;
+            if (productCount === 0) return;
+            
+            syncInProgress = true;
+            console.log('Starting auto-sync of ' + productCount + ' products to Firebase...');
+            
+            const products = Object.values(inventory);
+            const batchSize = 100;
+            let uploaded = 0;
+            let failed = 0;
+            
+            // First, get existing products from Firebase to avoid unnecessary uploads
+            let existingBarcodes = new Set();
+            try {
+                const snapshot = await db.collection('products').get();
+                snapshot.forEach((doc) => {
+                    existingBarcodes.add(doc.id);
+                });
+                console.log('Found ' + existingBarcodes.size + ' existing products in Firebase');
+            } catch (e) {
+                console.log('Could not fetch existing products, will upload all');
+            }
+            
+            // Filter to only products that don't exist in Firebase
+            const toUpload = products.filter(p => !existingBarcodes.has(p.barcode));
+            
+            if (toUpload.length === 0) {
+                console.log('All products already synced to Firebase');
+                syncInProgress = false;
+                return;
+            }
+            
+            console.log('Uploading ' + toUpload.length + ' new products...');
+            
+            for (let i = 0; i < toUpload.length; i += batchSize) {
+                const batch = toUpload.slice(i, i + batchSize);
+                
+                try {
+                    const promises = batch.map(product => 
+                        db.collection('products').doc(product.barcode).set({
+                            barcode: product.barcode,
+                            name: product.name,
+                            price: product.price,
+                            updatedAt: new Date().toISOString()
+                        }).then(() => {
+                            uploaded++;
+                            return true;
+                        }).catch(e => {
+                            failed++;
+                            return false;
+                        })
+                    );
+                    
+                    await Promise.all(promises);
+                    
+                    // Log progress every 5 batches
+                    if (Math.floor(i / batchSize) % 5 === 0) {
+                        console.log('Sync progress: ' + uploaded + '/' + toUpload.length);
+                    }
+                    
+                    // Small delay between batches
+                    await new Promise(r => setTimeout(r, 50));
+                    
+                } catch (error) {
+                    console.error('Batch error:', error);
+                    failed += batch.length;
+                }
+            }
+            
+            syncInProgress = false;
+            
+            if (uploaded > 0) {
+                console.log('✅ Auto-sync complete: ' + uploaded + ' products uploaded to Firebase');
+                showToast(uploaded + ' products synced to cloud');
+            }
+            if (failed > 0) {
+                console.log('⚠️ Failed: ' + failed + ' products');
+            }
+        }
+        
+        // Auto-sync after page loads and products are parsed
+        setTimeout(autoSyncToFirebase, 3000);
+
+    </script>
+</body>
+</html> + prod.price);
+        });
+        
+        // Initial render with all products
+        renderTable();
+        updateQueueUI();
+    
+        // --- AUTO FIREBASE SYNC ---
+        let syncInProgress = false;
+        
+        async function autoSyncToFirebase() {
+            if (syncInProgress) return;
+            
+            const productCount = Object.keys(inventory).length;
+            if (productCount === 0) return;
+            
+            syncInProgress = true;
+            console.log('Starting auto-sync of ' + productCount + ' products to Firebase...');
+            
+            const products = Object.values(inventory);
+            const batchSize = 100;
+            let uploaded = 0;
+            let failed = 0;
+            
+            // First, get existing products from Firebase to avoid unnecessary uploads
+            let existingBarcodes = new Set();
+            try {
+                const snapshot = await db.collection('products').get();
+                snapshot.forEach((doc) => {
+                    existingBarcodes.add(doc.id);
+                });
+                console.log('Found ' + existingBarcodes.size + ' existing products in Firebase');
+            } catch (e) {
+                console.log('Could not fetch existing products, will upload all');
+            }
+            
+            // Filter to only products that don't exist in Firebase
+            const toUpload = products.filter(p => !existingBarcodes.has(p.barcode));
+            
+            if (toUpload.length === 0) {
+                console.log('All products already synced to Firebase');
+                syncInProgress = false;
+                return;
+            }
+            
+            console.log('Uploading ' + toUpload.length + ' new products...');
+            
+            for (let i = 0; i < toUpload.length; i += batchSize) {
+                const batch = toUpload.slice(i, i + batchSize);
+                
+                try {
+                    const promises = batch.map(product => 
+                        db.collection('products').doc(product.barcode).set({
+                            barcode: product.barcode,
+                            name: product.name,
+                            price: product.price,
+                            updatedAt: new Date().toISOString()
+                        }).then(() => {
+                            uploaded++;
+                            return true;
+                        }).catch(e => {
+                            failed++;
+                            return false;
+                        })
+                    );
+                    
+                    await Promise.all(promises);
+                    
+                    // Log progress every 5 batches
+                    if (Math.floor(i / batchSize) % 5 === 0) {
+                        console.log('Sync progress: ' + uploaded + '/' + toUpload.length);
+                    }
+                    
+                    // Small delay between batches
+                    await new Promise(r => setTimeout(r, 50));
+                    
+                } catch (error) {
+                    console.error('Batch error:', error);
+                    failed += batch.length;
+                }
+            }
+            
+            syncInProgress = false;
+            
+            if (uploaded > 0) {
+                console.log('✅ Auto-sync complete: ' + uploaded + ' products uploaded to Firebase');
+                showToast(uploaded + ' products synced to cloud');
+            }
+            if (failed > 0) {
+                console.log('⚠️ Failed: ' + failed + ' products');
+            }
+        }
+        
+        // Auto-sync after page loads and products are parsed
+        setTimeout(autoSyncToFirebase, 3000);
+
+    </script>
+</body>
+</html> + product.price.toFixed(2);
+                document.getElementById('found-product').style.display = 'block';
+                document.getElementById('new-product-form').style.display = 'none';
+                showToast('✅ Found: ' + product.name);
+                console.log('Product found:', product);
+            } else {
+                // Product not found - try to find similar products
+                const similarProducts = findSimilarProducts(cleanBarcode);
+                
+                if (similarProducts.length > 0) {
+                    // Show similar products
+                    const product = similarProducts[0];
+                    document.getElementById('scan-barcode').value = product.barcode;
+                    document.getElementById('found-name').value = product.name + ' (Similar match)';
+                    document.getElementById('found-price').value = '
+
+        function addToQueueFromScan(barcode) {
+            addToQueue(barcode);
+            resetScanner();
+        }
+
+        function saveNewProduct() {
+            const barcode = document.getElementById('scan-barcode').value;
+            const name = document.getElementById('new-name').value.trim();
+            const priceStr = document.getElementById('new-price').value.trim();
+            
+            if (!name || !priceStr) {
+                alert('Please fill in all fields');
+                return;
+            }
+            
+            const price = parseFloat(priceStr.replace('$', ''));
+            if (isNaN(price)) {
+                alert('Invalid price');
+                return;
+            }
+            
+            const product = { barcode, name, price };
+            inventory[barcode] = product;
+            addToQueue(barcode);
+            renderTable();
+            resetScanner();
+            showToast('Added new product: ' + name);
+        }
+        
+        // Parse all products from rawTextData
+        const lines = rawTextData.trim().split('\n');
+        let parsedCount = 0;
+        lines.forEach(line => {
+            const product = parseProductLine(line);
+            if (product) {
+                inventory[product.barcode] = product;
+                parsedCount++;
+            }
+        });
+        console.log('Loaded ' + parsedCount + ' products into inventory. Total inventory items:', Object.keys(inventory).length);
+        
+        // Initial render with all products
+        renderTable();
+        updateQueueUI();
+    
+        // --- AUTO FIREBASE SYNC ---
+        let syncInProgress = false;
+        
+        async function autoSyncToFirebase() {
+            if (syncInProgress) return;
+            
+            const productCount = Object.keys(inventory).length;
+            if (productCount === 0) return;
+            
+            syncInProgress = true;
+            console.log('Starting auto-sync of ' + productCount + ' products to Firebase...');
+            
+            const products = Object.values(inventory);
+            const batchSize = 100;
+            let uploaded = 0;
+            let failed = 0;
+            
+            // First, get existing products from Firebase to avoid unnecessary uploads
+            let existingBarcodes = new Set();
+            try {
+                const snapshot = await db.collection('products').get();
+                snapshot.forEach((doc) => {
+                    existingBarcodes.add(doc.id);
+                });
+                console.log('Found ' + existingBarcodes.size + ' existing products in Firebase');
+            } catch (e) {
+                console.log('Could not fetch existing products, will upload all');
+            }
+            
+            // Filter to only products that don't exist in Firebase
+            const toUpload = products.filter(p => !existingBarcodes.has(p.barcode));
+            
+            if (toUpload.length === 0) {
+                console.log('All products already synced to Firebase');
+                syncInProgress = false;
+                return;
+            }
+            
+            console.log('Uploading ' + toUpload.length + ' new products...');
+            
+            for (let i = 0; i < toUpload.length; i += batchSize) {
+                const batch = toUpload.slice(i, i + batchSize);
+                
+                try {
+                    const promises = batch.map(product => 
+                        db.collection('products').doc(product.barcode).set({
+                            barcode: product.barcode,
+                            name: product.name,
+                            price: product.price,
+                            updatedAt: new Date().toISOString()
+                        }).then(() => {
+                            uploaded++;
+                            return true;
+                        }).catch(e => {
+                            failed++;
+                            return false;
+                        })
+                    );
+                    
+                    await Promise.all(promises);
+                    
+                    // Log progress every 5 batches
+                    if (Math.floor(i / batchSize) % 5 === 0) {
+                        console.log('Sync progress: ' + uploaded + '/' + toUpload.length);
+                    }
+                    
+                    // Small delay between batches
+                    await new Promise(r => setTimeout(r, 50));
+                    
+                } catch (error) {
+                    console.error('Batch error:', error);
+                    failed += batch.length;
+                }
+            }
+            
+            syncInProgress = false;
+            
+            if (uploaded > 0) {
+                console.log('✅ Auto-sync complete: ' + uploaded + ' products uploaded to Firebase');
+                showToast(uploaded + ' products synced to cloud');
+            }
+            if (failed > 0) {
+                console.log('⚠️ Failed: ' + failed + ' products');
+            }
+        }
+        
+        // Auto-sync after page loads and products are parsed
+        setTimeout(autoSyncToFirebase, 3000);
+
+    </script>
+</body>
+</html> + product.price.toFixed(2);
+                    document.getElementById('found-product').style.display = 'block';
+                    document.getElementById('new-product-form').style.display = 'none';
+                    showToast('Found similar: ' + product.name);
+                    console.log('Found similar product:', product);
+                } else {
+                    // No match at all - show register form
+                    document.getElementById('scan-barcode').value = cleanBarcode;
+                    document.getElementById('found-product').style.display = 'none';
+                    document.getElementById('new-product-form').style.display = 'block';
+                    
+                    // Auto-fill form with barcode for easy registration
+                    document.getElementById('new-barcode').value = cleanBarcode;
+                    document.getElementById('new-name').value = '';
+                    document.getElementById('new-price').value = '';
+                    showToast('⚠️ Product not found - Register below');
+                    document.getElementById('new-name').focus();
+                }
+            }
+        }
+        
+        // Find similar products by name or barcode
+        function findSimilarProducts(barcode) {
+            const results = [];
+            const barcodeLower = barcode.toLowerCase();
+            
+            for (let key in inventory) {
+                const product = inventory[key];
+                const nameLower = (product.name || '').toLowerCase();
+                
+                // Check if barcode or name contains the scanned value
+                if (key.toLowerCase().includes(barcodeLower) || 
+                    barcodeLower.includes(key.toLowerCase()) ||
+                    nameLower.includes(barcodeLower)) {
+                    results.push({ ...product, barcode: key });
+                }
+                
+                if (results.length >= 5) break; // Limit to 5 results
+            }
+            
+            return results;
         }
 
         function addToQueueFromScan(barcode) {
