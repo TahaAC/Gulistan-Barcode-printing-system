@@ -4274,19 +4274,18 @@ OMO 9KG 1       $28.99
         }
 
         function startCamera() {
-            // Optimized config for fast scanning
+            // Ultra-fast scanning config
             const config = { 
-                fps: 30,  // Higher FPS for faster detection
-                qrbox: { width: 200, height: 100 },  // Smaller scan area = faster
+                fps: 60,  // Maximum FPS for instant detection
+                qrbox: undefined,  // Full frame scanning = faster detection
                 aspectRatio: 1.0,
                 formatsToSupport: [
-                    Html5QrcodeSupportedFormats.CODE_128,
-                    Html5QrcodeSupportedFormats.EAN_13,
-                    Html5QrcodeSupportedFormats.EAN_8,
-                    Html5QrcodeSupportedFormats.UPC_A,
-                    Html5QrcodeSupportedFormats.UPC_E,
-                    Html5QrcodeSupportedFormats.CODE_39
-                ]
+                    Html5QrcodeSupportedFormats.CODE_128,  // Most common retail format
+                    Html5QrcodeSupportedFormats.EAN_13     // Second most common
+                ],
+                experimentalFeatures: {
+                    useBarCodeDetectorIfSupported: true  // Use native browser detector if available
+                }
             };
             html5QrCode = new Html5Qrcode("reader");
             
@@ -4494,10 +4493,10 @@ body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
 .labels-grid { display: grid; grid-template-columns: repeat(3, 63.5mm); grid-template-rows: repeat(7, 38.1mm); gap: 0; }
 .label { width: 63.5mm; height: 38.1mm; padding: 2mm; text-align: center; page-break-inside: avoid; display: flex; flex-direction: column; justify-content: center; align-items: center; box-sizing: border-box; }
 .barcode-img { margin: 0; }
-.barcode-img svg { max-width: 55mm; }
-.barcode-number { font-size: 6pt; font-family: 'Courier New', monospace; color: #000; margin-top: 0.5mm; }
-.name { font-size: 7pt; font-weight: bold; margin: 0.5mm 0; color: #000; max-width: 58mm; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.price { font-size: 10pt; font-weight: bold; color: #000; margin-top: 0.5mm; }
+.barcode-img svg { max-width: 50mm; }
+.barcode-number { font-size: 5pt; font-family: 'Courier New', monospace; color: #000; margin-top: 0.5mm; text-transform: uppercase; }
+.name { font-size: 6pt; font-weight: bold; margin: 0.5mm 0; color: #000; max-width: 58mm; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; }
+.price { font-size: 14pt; font-weight: bold; color: #000; margin-top: 1mm; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
 </head><body>
@@ -4509,8 +4508,8 @@ body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
                 for (let i = 0; i < item.qty; i++) {
                     html += `<div class="label">
                         <svg id="bc${bcIndex}" class="barcode-img"></svg>
-                        <div class="barcode-number">${item.barcode}</div>
-                        <div class="name">${item.name}</div>
+                        <div class="barcode-number">${item.barcode.toUpperCase()}</div>
+                        <div class="name">${item.name.toUpperCase()}</div>
                         <div class="price">$${item.price.toFixed(2)}</div>
                     </div>`;
                     barcodeData.push({ id: bcIndex, barcode: item.barcode });
@@ -4521,7 +4520,7 @@ body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
             html += '</div><script>';
             // Tiny barcode settings
             barcodeData.forEach(bd => {
-                html += `JsBarcode("#bc${bd.id}","${bd.barcode}",{width:0.8,height:15,displayValue:false,margin:1,fontSize:6});`;
+                html += `JsBarcode("#bc${bd.id}","${bd.barcode}",{width:0.7,height:12,displayValue:false,margin:1,fontSize:5});`;
             });
             html += 'setTimeout(()=>{window.print();},300);<\/script></body></html>';
             
