@@ -4453,17 +4453,19 @@ OMO 9KG 1       $28.99
             
             const doc = printFrame.contentWindow.document;
             
+            // Label size: 63.5mm x 38.1mm (2.5" x 1.5")
             let html = `<!DOCTYPE html>
 <html><head><title>Print Labels</title>
 <style>
-@page { size: A4; margin: 5mm; }
+@page { size: A4; margin: 0; }
 body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
-.labels-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2mm; padding: 0; }
-.label { border: 1px solid #ccc; padding: 3mm; text-align: center; page-break-inside: avoid; height: 32mm; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+.labels-grid { display: grid; grid-template-columns: repeat(3, 63.5mm); grid-template-rows: repeat(7, 38.1mm); gap: 0; }
+.label { width: 63.5mm; height: 38.1mm; padding: 2mm; text-align: center; page-break-inside: avoid; display: flex; flex-direction: column; justify-content: center; align-items: center; box-sizing: border-box; }
 .barcode-img { margin: 0; }
-.barcode-number { font-size: 8pt; font-family: 'Courier New', monospace; color: #333; margin-top: 1mm; }
-.name { font-size: 9pt; font-weight: bold; margin: 1mm 0; color: #333; max-width: 60mm; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.price { font-size: 16pt; font-weight: bold; color: #2563eb; margin-top: 1mm; }
+.barcode-img svg { max-width: 55mm; }
+.barcode-number { font-size: 6pt; font-family: 'Courier New', monospace; color: #000; margin-top: 0.5mm; }
+.name { font-size: 7pt; font-weight: bold; margin: 0.5mm 0; color: #000; max-width: 58mm; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.price { font-size: 10pt; font-weight: bold; color: #000; margin-top: 0.5mm; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
 </head><body>
@@ -4485,8 +4487,9 @@ body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
             });
             
             html += '</div><script>';
+            // Tiny barcode settings
             barcodeData.forEach(bd => {
-                html += `JsBarcode("#bc${bd.id}","${bd.barcode}",{width:1.2,height:25,displayValue:false,margin:2});`;
+                html += `JsBarcode("#bc${bd.id}","${bd.barcode}",{width:0.8,height:15,displayValue:false,margin:1,fontSize:6});`;
             });
             html += 'setTimeout(()=>{window.print();},300);<\/script></body></html>';
             
@@ -4503,31 +4506,31 @@ body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
             if (!items.length) { toast('Queue empty'); return; }
             const w = window.open('', '_blank');
             
-            // A4 size: 210mm x 297mm, 3 labels per row
+            // Label size: 63.5mm x 38.1mm (2.5" x 1.5")
             let html = `<!DOCTYPE html>
 <html><head><title>Barcode Labels</title>
 <style>
-@page { size: A4; margin: 5mm; }
+@page { size: A4; margin: 0; }
 body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
 .header { padding: 10px; background: #2563eb; color: white; display: flex; justify-content: space-between; align-items: center; }
 .header button { background: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold; }
-.labels-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2mm; padding: 5mm; }
-.label { border: 1px solid #ccc; padding: 3mm; text-align: center; page-break-inside: avoid; background: white; height: 32mm; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+.labels-grid { display: grid; grid-template-columns: repeat(3, 63.5mm); grid-template-rows: repeat(7, 38.1mm); gap: 0; }
+.label { width: 63.5mm; height: 38.1mm; padding: 2mm; text-align: center; page-break-inside: avoid; display: flex; flex-direction: column; justify-content: center; align-items: center; box-sizing: border-box; border: 1px dashed #ccc; }
 .barcode-img { margin: 0; }
-.barcode-img svg { max-width: 100%; }
-.barcode-number { font-size: 8pt; font-family: 'Courier New', monospace; color: #333; margin-top: 1mm; letter-spacing: 0.5px; }
-.name { font-size: 9pt; font-weight: bold; margin: 1mm 0; color: #333; max-width: 60mm; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.price { font-size: 16pt; font-weight: bold; color: #2563eb; margin-top: 1mm; }
+.barcode-img svg { max-width: 55mm; }
+.barcode-number { font-size: 6pt; font-family: 'Courier New', monospace; color: #000; margin-top: 0.5mm; }
+.name { font-size: 7pt; font-weight: bold; margin: 0.5mm 0; color: #000; max-width: 58mm; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.price { font-size: 10pt; font-weight: bold; color: #000; margin-top: 0.5mm; }
 @media print {
     .header { display: none; }
-    .labels-grid { padding: 0; }
+    .label { border: none; }
     body { margin: 0; }
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
 </head><body>
 <div class="header">
-    <h3 style="margin:0">Gulistan Barcode Labels</h3>
+    <h3 style="margin:0">Gulistan Barcode Labels - 63.5mm x 38.1mm</h3>
     <button onclick="window.close()">← Back</button>
 </div>
 <div class="labels-grid">`;
@@ -4548,9 +4551,9 @@ body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
             });
             
             html += '</div><script>';
-            // Generate smaller barcodes
+            // Tiny barcode settings
             barcodeData.forEach(bd => {
-                html += `JsBarcode("#bc${bd.id}","${bd.barcode}",{width:1.2,height:25,displayValue:false,margin:2,fontSize:10});`;
+                html += `JsBarcode("#bc${bd.id}","${bd.barcode}",{width:0.8,height:15,displayValue:false,margin:1,fontSize:6});`;
             });
             html += `<\/script></body></html>`;
             
