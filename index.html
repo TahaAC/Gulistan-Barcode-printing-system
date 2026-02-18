@@ -4274,18 +4274,21 @@ OMO 9KG 1       $28.99
         }
 
         function startCamera() {
-            // Ultra-fast scanning config
+            // Try native BarcodeDetector API first (much faster)
+            if ('BarcodeDetector' in window) {
+                startNativeScanner();
+                return;
+            }
+            
+            // Fallback to html5-qrcode
             const config = { 
-                fps: 60,  // Maximum FPS for instant detection
-                qrbox: undefined,  // Full frame scanning = faster detection
+                fps: 60,
+                qrbox: undefined,
                 aspectRatio: 1.0,
                 formatsToSupport: [
-                    Html5QrcodeSupportedFormats.CODE_128,  // Most common retail format
-                    Html5QrcodeSupportedFormats.EAN_13     // Second most common
-                ],
-                experimentalFeatures: {
-                    useBarCodeDetectorIfSupported: true  // Use native browser detector if available
-                }
+                    Html5QrcodeSupportedFormats.CODE_128,
+                    Html5QrcodeSupportedFormats.EAN_13
+                ]
             };
             html5QrCode = new Html5Qrcode("reader");
             
@@ -4293,11 +4296,9 @@ OMO 9KG 1       $28.99
                 { facingMode: "environment" },
                 config,
                 (decodedText) => {
-                    // Success - barcode found instantly
                     html5QrCode.stop().then(() => {
                         document.getElementById('scanning-status').style.display = 'none';
                         if (scannerMode === 'new-product') {
-                            // Fill the barcode field for new product
                             document.getElementById('new-barcode').value = decodedText.trim();
                             closeScanner();
                             document.getElementById('new-name').focus();
@@ -4307,9 +4308,7 @@ OMO 9KG 1       $28.99
                         }
                     }).catch(err => console.log('Stop error:', err));
                 },
-                (errorMessage) => {
-                    // Ignore scan errors (no barcode found yet)
-                }
+                (errorMessage) => {}
             ).then(() => {
                 document.getElementById('scanning-status').style.display = 'flex';
             }).catch(err => {
@@ -4318,8 +4317,81 @@ OMO 9KG 1       $28.99
                 document.getElementById('scanning-status').style.display = 'none';
             });
         }
+        
+        // Native BarcodeDetector (much faster - instant scanning)
+        let nativeVideo = null;
+        let nativeDetector = null;
+        let nativeStream = null;
+        
+        async function startNativeScanner() {
+            try {
+                nativeStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } 
+                });
+                
+                nativeVideo = document.createElement('video');
+                nativeVideo.srcObject = nativeStream;
+                nativeVideo.setAttribute('playsinline', true);
+                nativeVideo.style.width = '100%';
+                nativeVideo.style.borderRadius = '12px';
+                
+                const container = document.getElementById('reader');
+                container.innerHTML = '';
+                container.appendChild(nativeVideo);
+                
+                await nativeVideo.play();
+                
+                nativeDetector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e'] });
+                
+                document.getElementById('scanning-status').style.display = 'flex';
+                
+                detectBarcode();
+            } catch (err) {
+                console.log('Native scanner failed, falling back:', err);
+                startCamera(); // Fallback
+            }
+        }
+        
+        async function detectBarcode() {
+            if (!nativeVideo || !nativeDetector) return;
+            
+            try {
+                const barcodes = await nativeDetector.detect(nativeVideo);
+                
+                if (barcodes.length > 0) {
+                    const barcode = barcodes[0].rawValue;
+                    stopNativeScanner();
+                    document.getElementById('scanning-status').style.display = 'none';
+                    
+                    if (scannerMode === 'new-product') {
+                        document.getElementById('new-barcode').value = barcode.trim();
+                        closeScanner();
+                        document.getElementById('new-name').focus();
+                        toast('Barcode scanned - enter name and price');
+                    } else {
+                        handleBarcode(barcode);
+                    }
+                    return;
+                }
+            } catch (e) {}
+            
+            // Continue scanning
+            if (nativeVideo) {
+                requestAnimationFrame(detectBarcode);
+            }
+        }
+        
+        function stopNativeScanner() {
+            if (nativeStream) {
+                nativeStream.getTracks().forEach(track => track.stop());
+                nativeStream = null;
+            }
+            nativeVideo = null;
+            nativeDetector = null;
+        }
 
         function stopCamera() {
+            stopNativeScanner();
             if (html5QrCode && html5QrCode.isScanning) {
                 html5QrCode.stop().catch(err => console.log('Stop error:', err));
             }
@@ -4491,12 +4563,12 @@ OMO 9KG 1       $28.99
 @page { size: A4; margin: 0; }
 body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
 .labels-grid { display: grid; grid-template-columns: repeat(3, 63.5mm); grid-template-rows: repeat(7, 38.1mm); gap: 0; }
-.label { width: 63.5mm; height: 38.1mm; padding: 2mm; text-align: center; page-break-inside: avoid; display: flex; flex-direction: column; justify-content: center; align-items: center; box-sizing: border-box; }
+.label { width: 63.5mm; height: 38.1mm; padding: 1.5mm; text-align: center; page-break-inside: avoid; display: flex; flex-direction: column; justify-content: space-between; align-items: center; box-sizing: border-box; }
+.price { font-size: 14pt; font-weight: 900; color: #000; }
+.name { font-size: 7pt; font-weight: bold; color: #000; max-width: 60mm; text-transform: uppercase; line-height: 1.2; }
 .barcode-img { margin: 0; }
-.barcode-img svg { max-width: 45mm; }
-.barcode-number { font-size: 5pt; font-family: 'Courier New', monospace; color: #000; margin-top: 0.5mm; text-transform: uppercase; }
-.name { font-size: 5pt; font-weight: bold; margin: 0.5mm 0; color: #000; max-width: 58mm; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; }
-.price { font-size: 16pt; font-weight: 900; color: #000; margin-top: 1mm; }
+.barcode-img svg { max-width: 55mm; }
+.barcode-number { font-size: 6pt; font-family: 'Courier New', monospace; color: #000; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
 </head><body>
@@ -4507,10 +4579,10 @@ body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
             items.forEach(item => {
                 for (let i = 0; i < item.qty; i++) {
                     html += `<div class="label">
+                        <div class="price">$${item.price.toFixed(2)}</div>
+                        <div class="name">${item.name.toUpperCase()}</div>
                         <svg id="bc${bcIndex}" class="barcode-img"></svg>
                         <div class="barcode-number">${item.barcode.toUpperCase()}</div>
-                        <div class="name">${item.name.toUpperCase()}</div>
-                        <div class="price">$${item.price.toFixed(2)}</div>
                     </div>`;
                     barcodeData.push({ id: bcIndex, barcode: item.barcode });
                     bcIndex++;
@@ -4518,9 +4590,8 @@ body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
             });
             
             html += '</div><script>';
-            // Tiny barcode settings
             barcodeData.forEach(bd => {
-                html += `JsBarcode("#bc${bd.id}","${bd.barcode}",{width:0.6,height:10,displayValue:false,margin:1,fontSize:4});`;
+                html += `JsBarcode("#bc${bd.id}","${bd.barcode}",{width:1,height:15,displayValue:false,margin:1});`;
             });
             html += 'setTimeout(()=>{window.print();},300);<\/script></body></html>';
             
@@ -4546,12 +4617,12 @@ body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
 .header { padding: 10px; background: #2563eb; color: white; display: flex; justify-content: space-between; align-items: center; }
 .header button { background: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold; }
 .labels-grid { display: grid; grid-template-columns: repeat(3, 63.5mm); grid-template-rows: repeat(7, 38.1mm); gap: 0; }
-.label { width: 63.5mm; height: 38.1mm; padding: 2mm; text-align: center; page-break-inside: avoid; display: flex; flex-direction: column; justify-content: center; align-items: center; box-sizing: border-box; border: 1px dashed #ccc; }
+.label { width: 63.5mm; height: 38.1mm; padding: 1.5mm; text-align: center; page-break-inside: avoid; display: flex; flex-direction: column; justify-content: space-between; align-items: center; box-sizing: border-box; border: 1px dashed #ccc; }
+.price { font-size: 14pt; font-weight: 900; color: #000; }
+.name { font-size: 7pt; font-weight: bold; color: #000; max-width: 60mm; text-transform: uppercase; line-height: 1.2; }
 .barcode-img { margin: 0; }
-.barcode-img svg { max-width: 45mm; }
-.barcode-number { font-size: 5pt; font-family: 'Courier New', monospace; color: #000; margin-top: 0.5mm; text-transform: uppercase; }
-.name { font-size: 5pt; font-weight: bold; margin: 0.5mm 0; color: #000; max-width: 58mm; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; }
-.price { font-size: 16pt; font-weight: 900; color: #000; margin-top: 1mm; }
+.barcode-img svg { max-width: 55mm; }
+.barcode-number { font-size: 6pt; font-family: 'Courier New', monospace; color: #000; }
 @media print {
     .header { display: none; }
     .label { border: none; }
@@ -4571,10 +4642,10 @@ body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
             items.forEach(item => {
                 for (let i = 0; i < item.qty; i++) {
                     html += `<div class="label">
+                        <div class="price">$${item.price.toFixed(2)}</div>
+                        <div class="name">${item.name.toUpperCase()}</div>
                         <svg id="bc${bcIndex}" class="barcode-img"></svg>
                         <div class="barcode-number">${item.barcode.toUpperCase()}</div>
-                        <div class="name">${item.name.toUpperCase()}</div>
-                        <div class="price">$${item.price.toFixed(2)}</div>
                     </div>`;
                     barcodeData.push({ id: bcIndex, barcode: item.barcode });
                     bcIndex++;
@@ -4582,9 +4653,8 @@ body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
             });
             
             html += '</div><script>';
-            // Tiny barcode settings
             barcodeData.forEach(bd => {
-                html += `JsBarcode("#bc${bd.id}","${bd.barcode}",{width:0.6,height:10,displayValue:false,margin:1,fontSize:4});`;
+                html += `JsBarcode("#bc${bd.id}","${bd.barcode}",{width:1,height:15,displayValue:false,margin:1});`;
             });
             html += `<\/script></body></html>`;
             
