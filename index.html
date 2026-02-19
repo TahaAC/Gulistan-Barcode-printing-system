@@ -4280,15 +4280,16 @@ OMO 9KG 1       $28.99
                 return;
             }
             
-            // Fallback to html5-qrcode
+            // Fallback to html5-qrcode with optimized settings
             const config = { 
-                fps: 60,
-                qrbox: undefined,
+                fps: 120,
+                qrbox: { width: 200, height: 100 },
                 aspectRatio: 1.0,
                 formatsToSupport: [
                     Html5QrcodeSupportedFormats.CODE_128,
                     Html5QrcodeSupportedFormats.EAN_13
-                ]
+                ],
+                verbose: false
             };
             html5QrCode = new Html5Qrcode("reader");
             
@@ -4322,11 +4323,13 @@ OMO 9KG 1       $28.99
         let nativeVideo = null;
         let nativeDetector = null;
         let nativeStream = null;
+        let lastDetected = null;
+        let detectCount = 0;
         
         async function startNativeScanner() {
             try {
                 nativeStream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } 
+                    video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } } 
                 });
                 
                 nativeVideo = document.createElement('video');
@@ -4341,18 +4344,21 @@ OMO 9KG 1       $28.99
                 
                 await nativeVideo.play();
                 
-                nativeDetector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e'] });
+                nativeDetector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'qr_code', 'data_matrix'] });
                 
                 document.getElementById('scanning-status').style.display = 'flex';
+                lastDetected = null;
+                detectCount = 0;
                 
-                detectBarcode();
+                // Fast detection loop
+                scanLoop();
             } catch (err) {
                 console.log('Native scanner failed, falling back:', err);
                 startCamera(); // Fallback
             }
         }
         
-        async function detectBarcode() {
+        async function scanLoop() {
             if (!nativeVideo || !nativeDetector) return;
             
             try {
@@ -4360,24 +4366,34 @@ OMO 9KG 1       $28.99
                 
                 if (barcodes.length > 0) {
                     const barcode = barcodes[0].rawValue;
-                    stopNativeScanner();
-                    document.getElementById('scanning-status').style.display = 'none';
                     
-                    if (scannerMode === 'new-product') {
-                        document.getElementById('new-barcode').value = barcode.trim();
-                        closeScanner();
-                        document.getElementById('new-name').focus();
-                        toast('Barcode scanned - enter name and price');
+                    // Require 2 consecutive detections for reliability
+                    if (barcode === lastDetected) {
+                        detectCount++;
+                        if (detectCount >= 2) {
+                            stopNativeScanner();
+                            document.getElementById('scanning-status').style.display = 'none';
+                            
+                            if (scannerMode === 'new-product') {
+                                document.getElementById('new-barcode').value = barcode.trim();
+                                closeScanner();
+                                document.getElementById('new-name').focus();
+                                toast('Barcode scanned - enter name and price');
+                            } else {
+                                handleBarcode(barcode);
+                            }
+                            return;
+                        }
                     } else {
-                        handleBarcode(barcode);
+                        lastDetected = barcode;
+                        detectCount = 1;
                     }
-                    return;
                 }
             } catch (e) {}
             
-            // Continue scanning
+            // Continue scanning immediately
             if (nativeVideo) {
-                requestAnimationFrame(detectBarcode);
+                requestAnimationFrame(scanLoop);
             }
         }
         
@@ -4388,6 +4404,8 @@ OMO 9KG 1       $28.99
             }
             nativeVideo = null;
             nativeDetector = null;
+            lastDetected = null;
+            detectCount = 0;
         }
 
         function stopCamera() {
