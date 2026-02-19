@@ -4563,12 +4563,11 @@ OMO 9KG 1       $28.99
 @page { size: A4; margin: 0; }
 body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
 .labels-grid { display: grid; grid-template-columns: repeat(3, 63.5mm); grid-template-rows: repeat(7, 38.1mm); gap: 0; }
-.label { width: 63.5mm; height: 38.1mm; padding: 1.5mm; text-align: center; page-break-inside: avoid; display: flex; flex-direction: column; justify-content: space-between; align-items: center; box-sizing: border-box; }
-.price { font-size: 14pt; font-weight: 900; color: #000; }
-.name { font-size: 7pt; font-weight: bold; color: #000; max-width: 60mm; text-transform: uppercase; line-height: 1.2; }
+.label { width: 63.5mm; height: 38.1mm; padding: 1mm; text-align: center; page-break-inside: avoid; display: flex; flex-direction: column; justify-content: center; align-items: center; box-sizing: border-box; gap: 0; }
+.price { font-size: 14pt; font-weight: 900; color: #000; margin: 0; line-height: 1; }
+.name { font-size: 7pt; font-weight: bold; color: #000; max-width: 60mm; text-transform: uppercase; line-height: 1; margin: 1mm 0; }
 .barcode-img { margin: 0; }
 .barcode-img svg { max-width: 55mm; }
-.barcode-number { font-size: 6pt; font-family: 'Courier New', monospace; color: #000; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
 </head><body>
