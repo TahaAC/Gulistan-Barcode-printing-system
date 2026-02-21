@@ -4586,6 +4586,7 @@ body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
 .name { font-size: 12pt; font-weight: bold; color: #000; max-width: 66mm; text-transform: uppercase; line-height: 1; margin: 0; padding: 0; }
 .barcode-img { margin: 0; padding: 0; }
 .barcode-img svg { max-width: 62mm; }
+.barcode-number { font-size: 7pt; font-family: Arial, sans-serif; color: #000; margin: 0; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
 </head><body>
@@ -4599,6 +4600,7 @@ body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
                         <div class="price">$${item.price.toFixed(2)}</div>
                         <div class="name">${item.name.toUpperCase()}</div>
                         <svg id="bc${bcIndex}" class="barcode-img"></svg>
+                        <div class="barcode-number">${item.barcode}</div>
                     </div>`;
                     barcodeData.push({ id: bcIndex, barcode: item.barcode });
                     bcIndex++;
@@ -4607,7 +4609,7 @@ body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
             
             html += '</div><script>';
             barcodeData.forEach(bd => {
-                html += `JsBarcode("#bc${bd.id}","${bd.barcode}",{width:1.5,height:20,displayValue:false,margin:1});`;
+                html += `JsBarcode("#bc${bd.id}","${bd.barcode}",{width:1.5,height:18,displayValue:false,margin:1});`;
             });
             html += 'setTimeout(()=>{window.print();},300);<\/script></body></html>';
             
@@ -4638,6 +4640,7 @@ body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
 .name { font-size: 12pt; font-weight: bold; color: #000; max-width: 66mm; text-transform: uppercase; line-height: 1; margin: 0; padding: 0; }
 .barcode-img { margin: 0; padding: 0; }
 .barcode-img svg { max-width: 62mm; }
+.barcode-number { font-size: 7pt; font-family: Arial, sans-serif; color: #000; margin: 0; }
 @media print {
     .header { display: none; }
     .label { border: none; }
@@ -4660,6 +4663,7 @@ body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
                         <div class="price">$${item.price.toFixed(2)}</div>
                         <div class="name">${item.name.toUpperCase()}</div>
                         <svg id="bc${bcIndex}" class="barcode-img"></svg>
+                        <div class="barcode-number">${item.barcode}</div>
                     </div>`;
                     barcodeData.push({ id: bcIndex, barcode: item.barcode });
                     bcIndex++;
@@ -4668,7 +4672,7 @@ body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
             
             html += '</div><script>';
             barcodeData.forEach(bd => {
-                html += `JsBarcode("#bc${bd.id}","${bd.barcode}",{width:1.5,height:20,displayValue:false,margin:1});`;
+                html += `JsBarcode("#bc${bd.id}","${bd.barcode}",{width:1.5,height:18,displayValue:false,margin:1});`;
             });
             html += `<\/script></body></html>`;
             
