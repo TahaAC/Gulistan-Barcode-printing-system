@@ -33,7 +33,7 @@
             --danger: #ef4444;
             --success: #22c55e;
         }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; -webkit-tap-highlight-color: transparent; }
         html, body { width: 100%; min-height: 100%; }
         body { background: var(--bg); color: var(--text); display: flex; flex-direction: column; }
         
@@ -41,24 +41,24 @@
         .brand { font-size: 1.2rem; font-weight: 700; color: var(--primary); display: flex; align-items: center; gap: 0.5rem; }
         .logo-img { height: 36px; width: auto; border-radius: 6px; }
         
-        button { padding: 0.6rem 1rem; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; font-size: 0.9rem; transition: all 0.2s; }
+        button { padding: 0.6rem 1rem; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; font-size: 0.9rem; transition: all 0.2s; touch-action: manipulation; }
         .btn-primary { background: var(--primary); color: white; }
         .btn-primary:hover { background: var(--primary-dark); }
         .btn-secondary { background: white; border: 1px solid var(--border); color: var(--text); }
         .btn-danger { background: var(--danger); color: white; }
         .btn-scan { background: linear-gradient(135deg, #2563eb, #1e40af); color: white; padding: 0.8rem 1.5rem; font-size: 1rem; }
         
-        main { flex: 1; padding: 1rem; display: flex; flex-direction: column; gap: 1rem; overflow-y: auto; }
+        main { flex: 1; padding: 1rem; display: flex; flex-direction: column; gap: 1rem; overflow-y: auto; padding-bottom: 80px; }
         
         .card { background: var(--surface); border-radius: 12px; padding: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
         
         .search-bar { display: flex; align-items: center; gap: 0.5rem; background: var(--surface); padding: 0.5rem 1rem; border-radius: 50px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        .search-input { flex: 1; border: none; outline: none; font-size: 1rem; background: transparent; }
+        .search-input { flex: 1; border: none; outline: none; font-size: 1rem; background: transparent; min-width: 0; }
         
         .view { display: none; flex-direction: column; gap: 1rem; flex: 1; }
         .view.active { display: flex; }
         
-        .table-container { flex: 1; overflow: auto; border-radius: 12px; background: var(--surface); box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .table-container { flex: 1; overflow: auto; border-radius: 12px; background: var(--surface); box-shadow: 0 2px 8px rgba(0,0,0,0.05); -webkit-overflow-scrolling: touch; }
         table { width: 100%; border-collapse: collapse; }
         th, td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid var(--border); }
         th { background: var(--bg); font-weight: 600; position: sticky; top: 0; z-index: 10; }
@@ -67,9 +67,9 @@
         
         .badge { background: var(--primary); color: white; padding: 0.2rem 0.6rem; border-radius: 20px; font-size: 0.8rem; margin-left: 0.25rem; }
         
-        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(4px); }
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(4px); padding: 0.5rem; }
         .modal.active { display: flex; }
-        .modal-content { background: var(--surface); padding: 1.5rem; border-radius: 16px; max-width: 500px; width: 95%; max-height: 90vh; overflow-y: auto; animation: slideUp 0.3s ease; }
+        .modal-content { background: var(--surface); padding: 1.5rem; border-radius: 16px; max-width: 500px; width: 100%; max-height: 90vh; overflow-y: auto; animation: slideUp 0.3s ease; -webkit-overflow-scrolling: touch; }
         @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         
         .scanner-container { width: 100%; border-radius: 12px; overflow: hidden; background: #000; position: relative; }
@@ -89,7 +89,7 @@
         .form-group input { width: 100%; padding: 0.75rem; border: 2px solid var(--border); border-radius: 8px; font-size: 1rem; transition: border-color 0.2s; }
         .form-group input:focus { outline: none; border-color: var(--primary); }
         
-        .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--text); color: white; padding: 0.75rem 1.5rem; border-radius: 50px; display: none; z-index: 2000; font-weight: 500; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        .toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: var(--text); color: white; padding: 0.75rem 1.5rem; border-radius: 50px; display: none; z-index: 2000; font-weight: 500; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
         
         .qty-controls { display: flex; align-items: center; gap: 0.25rem; }
         .qty-input { width: 40px; text-align: center; border: 1px solid var(--border); border-radius: 6px; padding: 0.3rem; font-weight: 600; }
@@ -100,12 +100,50 @@
         .scanning-indicator { position: absolute; top: 10px; right: 10px; background: var(--success); color: white; padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.8rem; display: flex; align-items: center; gap: 0.3rem; animation: pulse 1.5s infinite; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
         
-        @media (max-width: 600px) {
-            header { padding: 0.5rem; }
-            .brand { font-size: 1rem; }
-            .logo-img { height: 28px; }
-            th, td { padding: 0.5rem; font-size: 0.85rem; }
-            .product-result .price { font-size: 2rem; }
+        /* Mobile Styles */
+        @media (max-width: 768px) {
+            header { padding: 0.5rem; flex-wrap: wrap; gap: 0.5rem; }
+            .brand { font-size: 0.95rem; }
+            .brand span { display: none; }
+            .logo-img { height: 32px; }
+            .btn-scan { padding: 0.6rem 1rem; font-size: 0.85rem; }
+            .btn-scan span { display: none; }
+            .btn-secondary span { display: none; }
+            main { padding: 0.75rem; padding-bottom: 80px; }
+            .card { padding: 0.75rem; }
+            .search-bar { padding: 0.5rem 0.75rem; }
+            .search-input { font-size: 16px; }
+            
+            /* Table mobile */
+            .table-container { border-radius: 8px; }
+            table { font-size: 0.85rem; }
+            th, td { padding: 0.5rem 0.5rem; }
+            th:nth-child(1), td:nth-child(1) { max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            th:nth-child(2), td:nth-child(2) { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            
+            /* Quick Add mobile */
+            .quick-add-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+            .quick-add-grid > div:first-child { grid-column: 1 / -1; }
+            .quick-add-grid button:last-child { grid-column: 1 / -1; }
+            
+            /* Product result */
+            .product-result .name { font-size: 1.1rem; }
+            .product-result .price { font-size: 1.8rem; }
+            
+            /* Modal */
+            .modal-content { padding: 1rem; border-radius: 12px; }
+            
+            /* Buttons */
+            button { padding: 0.5rem 0.75rem; font-size: 0.85rem; }
+            .btn-qty { padding: 0.4rem 0.5rem; min-width: 36px; min-height: 36px; }
+        }
+        
+        @media (max-width: 400px) {
+            .brand span { display: none; }
+            .btn-scan span { display: none; }
+            .btn-secondary span { display: none; }
+            th, td { padding: 0.4rem; font-size: 0.8rem; }
+            .price-tag { font-size: 0.85rem; }
         }
     </style>
 </head>
@@ -144,13 +182,13 @@
 
             <div class="card">
                 <h3 style="margin-bottom:0.75rem;color:var(--primary);"><i class="fa-solid fa-plus-circle"></i> Quick Add</h3>
-                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:0.5rem;">
+                <div class="quick-add-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:0.5rem;">
                     <div style="display:flex;gap:0.25rem;">
-                        <input type="text" id="new-barcode" placeholder="Barcode" style="flex:1;padding:0.6rem;border:2px solid var(--border);border-radius:8px;">
+                        <input type="text" id="new-barcode" placeholder="Barcode" style="flex:1;padding:0.6rem;border:2px solid var(--border);border-radius:8px;font-size:16px;">
                         <button class="btn-scan" onclick="openScannerForNewProduct()" style="padding:0.6rem 0.8rem;border-radius:8px;font-size:0.9rem;"><i class="fa-solid fa-camera"></i> Scan</button>
                     </div>
-                    <input type="text" id="new-name" placeholder="Name" style="padding:0.6rem;border:2px solid var(--border);border-radius:8px;">
-                    <input type="number" id="new-price" placeholder="Price" step="0.01" style="padding:0.6rem;border:2px solid var(--border);border-radius:8px;">
+                    <input type="text" id="new-name" placeholder="Name" style="padding:0.6rem;border:2px solid var(--border);border-radius:8px;font-size:16px;">
+                    <input type="number" id="new-price" placeholder="Price" step="0.01" style="padding:0.6rem;border:2px solid var(--border);border-radius:8px;font-size:16px;">
                     <button class="btn-primary" onclick="addNewProduct()"><i class="fa-solid fa-plus"></i> Add</button>
                 </div>
             </div>
