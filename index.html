@@ -3,308 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="theme-color" content="#2563eb">
-    <title>Gulistan Barcode</title>
-    <link rel="icon" type="image/png" href="logo.png">
-    <link rel="apple-touch-icon" href="logo.png">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-    <script>
-        firebase.initializeApp({
-            apiKey: "AIzaSyAa8C_GyMIEZeAyJhjM1QQIiGh-cww1Iro",
-            authDomain: "barcode-printing-93880.firebaseapp.com",
-            projectId: "barcode-printing-93880"
-        });
-        const db = firebase.firestore();
-    </script>
-    <style>
-        :root {
-            --primary: #2563eb;
-            --primary-dark: #1e40af;
-            --secondary: #64748b;
-            --bg: #f1f5f9;
-            --surface: #ffffff;
-            --text: #0f172a;
-            --border: #e2e8f0;
-            --danger: #ef4444;
-            --success: #22c55e;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; -webkit-tap-highlight-color: transparent; }
-        html, body { width: 100%; min-height: 100%; }
-        body { background: var(--bg); color: var(--text); display: flex; flex-direction: column; }
-        
-        header { background: var(--surface); padding: 0.75rem 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
-        .brand { font-size: 1.2rem; font-weight: 700; color: var(--primary); display: flex; align-items: center; gap: 0.5rem; }
-        .logo-img { height: 36px; width: auto; border-radius: 6px; }
-        
-        button { padding: 0.6rem 1rem; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; font-size: 0.9rem; transition: all 0.2s; touch-action: manipulation; }
-        .btn-primary { background: var(--primary); color: white; }
-        .btn-primary:hover { background: var(--primary-dark); }
-        .btn-secondary { background: white; border: 1px solid var(--border); color: var(--text); }
-        .btn-danger { background: var(--danger); color: white; }
-        .btn-scan { background: linear-gradient(135deg, #2563eb, #1e40af); color: white; padding: 0.8rem 1.5rem; font-size: 1rem; }
-        
-        main { flex: 1; padding: 1rem; display: flex; flex-direction: column; gap: 1rem; overflow-y: auto; padding-bottom: 80px; }
-        
-        .card { background: var(--surface); border-radius: 12px; padding: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-        
-        .search-bar { display: flex; align-items: center; gap: 0.5rem; background: var(--surface); padding: 0.5rem 1rem; border-radius: 50px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        .search-input { flex: 1; border: none; outline: none; font-size: 1rem; background: transparent; min-width: 0; }
-        
-        .view { display: none; flex-direction: column; gap: 1rem; flex: 1; }
-        .view.active { display: flex; }
-        
-        .table-container { flex: 1; overflow: auto; border-radius: 12px; background: var(--surface); box-shadow: 0 2px 8px rgba(0,0,0,0.05); -webkit-overflow-scrolling: touch; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid var(--border); }
-        th { background: var(--bg); font-weight: 600; position: sticky; top: 0; z-index: 10; }
-        tr:hover { background: var(--bg); }
-        .price-tag { font-weight: 700; color: var(--primary); font-size: 1rem; }
-        
-        .badge { background: var(--primary); color: white; padding: 0.2rem 0.6rem; border-radius: 20px; font-size: 0.8rem; margin-left: 0.25rem; }
-        
-        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(4px); padding: 0.5rem; }
-        .modal.active { display: flex; }
-        .modal-content { background: var(--surface); padding: 1.5rem; border-radius: 16px; max-width: 500px; width: 100%; max-height: 90vh; overflow-y: auto; animation: slideUp 0.3s ease; -webkit-overflow-scrolling: touch; }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        
-        .scanner-container { width: 100%; border-radius: 12px; overflow: hidden; background: #000; position: relative; }
-        #qr-shaded-region { border-radius: 12px; }
-        
-        .product-result { text-align: center; padding: 1.5rem; background: linear-gradient(135deg, #f0f9ff, #e0f2fe); border-radius: 12px; margin-top: 1rem; }
-        .product-result .name { font-size: 1.4rem; font-weight: 700; color: var(--text); margin-bottom: 0.5rem; }
-        .product-result .price { font-size: 2.5rem; font-weight: 800; color: var(--primary); margin: 0.5rem 0; }
-        .product-result .barcode { font-size: 0.9rem; color: var(--secondary); margin-top: 0.5rem; }
-        .product-result .barcode-img { margin: 1rem 0; background: white; padding: 0.5rem; border-radius: 8px; }
-        
-        .not-found { text-align: center; padding: 1.5rem; background: #fef2f2; border-radius: 12px; margin-top: 1rem; }
-        .not-found .icon { font-size: 3rem; color: var(--danger); margin-bottom: 0.5rem; }
-        
-        .form-group { margin-bottom: 1rem; }
-        .form-group label { display: block; margin-bottom: 0.3rem; font-weight: 600; font-size: 0.9rem; }
-        .form-group input { width: 100%; padding: 0.75rem; border: 2px solid var(--border); border-radius: 8px; font-size: 1rem; transition: border-color 0.2s; }
-        .form-group input:focus { outline: none; border-color: var(--primary); }
-        
-        .toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: var(--text); color: white; padding: 0.75rem 1.5rem; border-radius: 50px; display: none; z-index: 2000; font-weight: 500; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
-        
-        .qty-controls { display: flex; align-items: center; gap: 0.25rem; }
-        .qty-input { width: 40px; text-align: center; border: 1px solid var(--border); border-radius: 6px; padding: 0.3rem; font-weight: 600; }
-        .btn-qty { padding: 0.3rem 0.6rem; min-width: 32px; }
-        
-        #show-more-container { padding: 1rem; text-align: center; }
-        
-        .scanning-indicator { position: absolute; top: 10px; right: 10px; background: var(--success); color: white; padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.8rem; display: flex; align-items: center; gap: 0.3rem; animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-        
-        .sync-indicator { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--secondary); margin-left: 1rem; }
-        .sync-indicator i { font-size: 0.75rem; }
-
-        @media (max-width: 768px) {
-            header { padding: 0.5rem; flex-wrap: wrap; gap: 0.5rem; }
-            .brand { font-size: 0.95rem; }
-            .brand span { display: none; }
-            .logo-img { height: 32px; }
-            .btn-scan { padding: 0.6rem 1rem; font-size: 0.85rem; }
-            .btn-scan span { display: none; }
-            .btn-secondary span { display: none; }
-            main { padding: 0.75rem; padding-bottom: 80px; }
-            .card { padding: 0.75rem; }
-            .search-bar { padding: 0.5rem 0.75rem; }
-            .search-input { font-size: 16px; }
-            .table-container { border-radius: 8px; }
-            table { font-size: 0.85rem; }
-            th, td { padding: 0.5rem 0.5rem; }
-            .quick-add-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
-            .quick-add-grid > div:first-child { grid-column: 1 / -1; }
-            .quick-add-grid button:last-child { grid-column: 1 / -1; }
-            .product-result .name { font-size: 1.1rem; }
-            .product-result .price { font-size: 1.8rem; }
-            .modal-content { padding: 1rem; border-radius: 12px; }
-            button { padding: 0.5rem 0.75rem; font-size: 0.85rem; }
-            .btn-qty { padding: 0.4rem 0.5rem; min-width: 36px; min-height: 36px; }
-        }
-    </style>
-</head>
-<body>
-    <header>
-        <div class="brand">
-            <img src="logo.png" alt="Logo" class="logo-img" onerror="this.outerHTML='<i class=\'fa-solid fa-barcode\' style=\'font-size:1.5rem\'></i>'">
-            <span>Gulistan Barcode</span>
-            <div id="sync-status" class="sync-indicator">
-                <i class="fa-solid fa-spinner fa-spin"></i> <span id="sync-text">Loading...</span>
-            </div>
-        </div>
-        <div style="display:flex;gap:0.5rem;">
-            <button class="btn-scan" onclick="openScanner()">
-                <i class="fa-solid fa-camera"></i> <span>Scan</span>
-            </button>
-            <button class="btn-secondary" onclick="switchView('queue-view')">
-                <i class="fa-solid fa-print"></i> <span>Queue</span>
-                <span id="queue-count" class="badge">0</span>
-            </button>
-        </div>
-    </header>
-
-    <main>
-        <div id="inventory-view" class="view active">
-            <div class="search-bar">
-                <i class="fa-solid fa-search" style="color:var(--secondary)"></i>
-                <input type="text" id="search-input" class="search-input" placeholder="Search products..." oninput="handleSearch()">
-                <button class="btn-primary" onclick="openScanner()" style="border-radius:50px;padding:0.5rem;">
-                    <i class="fa-solid fa-qrcode"></i>
-                </button>
-            </div>
-            
-            <div class="card" style="display:flex;justify-content:space-between;align-items:center;">
-                <span><i class="fa-solid fa-box"></i> <strong id="total-products">0</strong> products</span>
-                <span style="color:var(--secondary);">Showing <strong id="showing-products">0</strong></span>
-            </div>
-
-            <div class="card">
-                <h3 style="margin-bottom:0.75rem;color:var(--primary);"><i class="fa-solid fa-plus-circle"></i> Quick Add</h3>
-                <div class="quick-add-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:0.5rem;">
-                    <div style="display:flex;gap:0.25rem;">
-                        <input type="text" id="new-barcode" placeholder="Barcode" style="flex:1;padding:0.6rem;border:2px solid var(--border);border-radius:8px;font-size:16px;">
-                        <button class="btn-scan" onclick="openScannerForNewProduct()" style="padding:0.6rem 0.8rem;border-radius:8px;font-size:0.9rem;"><i class="fa-solid fa-camera"></i> Scan</button>
-                    </div>
-                    <input type="text" id="new-name" placeholder="Name" style="padding:0.6rem;border:2px solid var(--border);border-radius:8px;font-size:16px;">
-                    <input type="number" id="new-price" placeholder="Price" step="0.01" style="padding:0.6rem;border:2px solid var(--border);border-radius:8px;font-size:16px;">
-                    <button class="btn-primary" onclick="addNewProduct()"><i class="fa-solid fa-plus"></i> Add</button>
-                </div>
-            </div>
-
-            <div class="table-container">
-                <table>
-                    <thead><tr><th>Barcode</th><th>Product</th><th>Price</th><th>Action</th></tr></thead>
-                    <tbody id="product-list"></tbody>
-                </table>
-                <div id="no-results" style="display:none;text-align:center;padding:2rem;color:var(--secondary);">
-                    <i class="fa-solid fa-box-open" style="font-size:3rem;margin-bottom:1rem;"></i>
-                    <p>No products found</p>
-                </div>
-            </div>
-            <div id="show-more-container"></div>
-        </div>
-
-        <div id="queue-view" class="view">
-            <div class="card" style="display:flex;justify-content:space-between;align-items:center;">
-                <h3><i class="fa-solid fa-list-check"></i> Print Queue</h3>
-                <div style="display:flex;gap:0.5rem;">
-                    <button class="btn-secondary" onclick="switchView('inventory-view')"><i class="fa-solid fa-arrow-left"></i> Back</button>
-                    <button class="btn-danger" onclick="clearQueue()"><i class="fa-solid fa-trash"></i> Clear</button>
-                </div>
-            </div>
-            <div class="table-container">
-                <table>
-                    <thead><tr><th>Product</th><th>Price</th><th>Qty</th><th>Total</th><th></th></tr></thead>
-                    <tbody id="queue-list"></tbody>
-                </table>
-            </div>
-            <div class="card" style="display:flex;gap:0.5rem;flex-wrap:wrap;">
-                <button class="btn-primary" onclick="printDirect()" style="flex:1;min-width:140px;"><i class="fa-solid fa-print"></i> Print Direct</button>
-                <button class="btn-secondary" onclick="printLabels()" style="flex:1;min-width:140px;"><i class="fa-solid fa-barcode"></i> Preview Labels</button>
-                <button class="btn-secondary" onclick="printList()" style="flex:1;min-width:140px;"><i class="fa-solid fa-list"></i> Print List</button>
-            </div>
-        </div>
-    </main>
-
-    <div id="scanner-modal" class="modal">
-        <div class="modal-content">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
-                <h2><i class="fa-solid fa-camera"></i> Barcode Scanner</h2>
-                <button class="btn-secondary" onclick="closeScanner()" style="padding:0.5rem;border-radius:50%;"><i class="fa-solid fa-times"></i></button>
-            </div>
-            <div class="scanner-container" id="scanner-container">
-                <div id="reader" style="width:100%;"></div>
-            </div>
-            <div id="scanning-status" class="scanning-indicator" style="display:none;">
-                <i class="fa-solid fa-circle" style="font-size:0.5rem;"></i> Scanning...
-            </div>
-            <div id="scan-result"></div>
-            <div style="margin-top:1rem;text-align:center;">
-                <p style="color:var(--secondary);font-size:0.85rem;margin-bottom:0.5rem;">Or enter manually:</p>
-                <div style="display:flex;gap:0.5rem;">
-                    <input type="text" id="manual-barcode" placeholder="Enter barcode" style="flex:1;padding:0.75rem;border:2px solid var(--border);border-radius:8px;font-size:1rem;" onkeypress="if(event.key==='Enter')handleManualScan()">
-                    <button class="btn-primary" onclick="handleManualScan()"><i class="fa-solid fa-search"></i></button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div id="edit-modal" class="modal">
-        <div class="modal-content">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
-                <h2>Edit Price</h2>
-                <button class="btn-secondary" onclick="closeEditModal()" style="padding:0.5rem;border-radius:50%;"><i class="fa-solid fa-times"></i></button>
-            </div>
-            <div class="form-group">
-                <label>Barcode</label>
-                <input type="text" id="edit-barcode" readonly style="background:var(--bg);">
-            </div>
-            <div class="form-group">
-                <label>Product Name</label>
-                <input type="text" id="edit-name" readonly style="background:var(--bg);">
-            </div>
-            <div class="form-group">
-                <label>New Price ($)</label>
-                <input type="number" id="edit-price" step="0.01">
-            </div>
-            <div style="display:flex;gap:0.5rem;">
-                <button class="btn-primary" onclick="saveEdit()" style="flex:1;"><i class="fa-solid fa-save"></i> Save</button>
-                <button class="btn-secondary" onclick="closeEditModal()" style="flex:1;">Cancel</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="toast" class="toast"></div>
-
-    <script>
-        // New Products List
-        const newProducts = [
-            { code: "123", name: "Gulistan walnut kernel 500g", price: 15.49, qty: 1 },
-            { code: "229997", name: "APRICOT 400GR", price: 6.99, qty: 1 },
-            { code: "20210472", name: "Atlas salted peanut 400g", price: 6.99, qty: 2 },
-            { code: "20250454", name: "Atlas Iranian roasted pistachio 400g", price: 14.99, qty: 1 },
-            { code: "89785464", name: "Gulistan white sugar 2kg", price: 6.99, qty: 1 },
-            { code: "567657567", name: "Gulistan pumpkin pepita 500g", price: 8.49, qty: 1 },
-            { code: "4160678590107", name: "Alvita coconut biscuit", price: 3.49, qty: 1 },
-            { code: "3218731741247", name: "Mumtaz trail mix 400g", price: 7.99, qty: 1 },
-            { code: "6260031022035", name: "Sehat olive shampoo", price: 4.49, qty: 2 },
-            { code: "9339358004011", name: "Vinegar sunflower seed", price: 4.99, qty: 1 },
-            { code: "817150258799", name: "AFG raw almond 500g", price: 10.99, qty: 1 },
-            { code: "9339358004172", name: "Raw chickpeas large 1kg", price: 6.49, qty: 1 },
-            { code: "9339358000655", name: "Red henna", price: 5.99, qty: 1 },
-            { code: "9339358000662", name: "Black henna", price: 5.99, qty: 1 },
-            { code: "9339358004103", name: "Honey sohan", price: 16.49, qty: 1 },
-            { code: "4421000224221", name: "Sesame crunchy snack", price: 5.50, qty: 1 },
-            { code: "827150249253", name: "AFG sunflower kernels 400g", price: 4.49, qty: 1 },
-            { code: "6212851204207", name: "Mumtaz Roasted & salted pistachio 500g", price: 13.99, qty: 1 },
-            { code: "4822115141241", name: "Mumtaz trail mix 400g", price: 7.99, qty: 1 },
-            { code: "6261149057254", name: "Collection chocolate gift pack", price: 14.99, qty: 1 },
-            { code: "6526485325", name: "Gulistan Vietnam cashews 700g", price: 15.99, qty: 1 },
-            { code: "45242253789", name: "Gulistan afghani palawi raisins 1kg", price: 11.99, qty: 1 },
-            { code: "9710015225596", name: "Cheetos puffs party bag 165g", price: 5. sincerely apologize for the frustration and the incomplete response previously. The code was cut off because the raw text data list was exceptionally long, exceeding the output limits of the system. 
-
-To solve this and ensure **all your products are saved to Firebase for online access** and **newly registered products save directly to the cloud**, I have completely refactored the code. 
-
-Here is what changed to make it work flawlessly:
-1. **Smart Cloud Loading:** When the app opens, it fetches products directly from Firebase. If your Firebase database is empty (first time use), it will automatically parse your `rawTextData` and the new `newProducts` array, push them all to Firestore, and then load them.
-2. **Online Registration:** When a product is added via "Quick Add" or from the "Not Found" scanner prompt, it instantly writes to Firebase Firestore `db.collection('products').doc(barcode).set(...)`.
-3. **Online Price Editing:** Editing a price updates the cloud in real time.
-4. **Data Separation:** The code is structured cleanly so the `rawTextData` doesn't clutter the main logic.
-
-Here is the fully functional and complete code:
-
-```html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#2563eb">
     <title>Gulistan Barcode</title>
@@ -342,8 +41,10 @@ Here is the fully functional and complete code:
         .search-input { flex: 1; border: none; outline: none; font-size: 1rem; background: transparent; min-width: 0; }
         .view { display: none; flex-direction: column; gap: 1rem; flex: 1; } .view.active { display: flex; }
         .table-container { flex: 1; overflow: auto; border-radius: 12px; background: var(--surface); box-shadow: 0 2px 8px rgba(0,0,0,0.05); -webkit-overflow-scrolling: touch; }
-        table { width: 100%; border-collapse: collapse; } th, td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid var(--border); }
-        th { background: var(--bg); font-weight: 600; position: sticky; top: 0; z-index: 10; } tr:hover { background: var(--bg); }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--bg); font-weight: 600; position: sticky; top: 0; z-index: 10; }
+        tr:hover { background: var(--bg); }
         .price-tag { font-weight: 700; color: var(--primary); font-size: 1rem; }
         .badge { background: var(--primary); color: white; padding: 0.2rem 0.6rem; border-radius: 20px; font-size: 0.8rem; margin-left: 0.25rem; }
         .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(4px); padding: 0.5rem; }
@@ -368,11 +69,34 @@ Here is the fully functional and complete code:
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
         .sync-indicator { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; color: var(--secondary); }
         .sync-indicator.synced { color: var(--success); }
+
+        /* Action Buttons */
+        .action-btns { display: flex; gap: 0.25rem; align-items: center; }
+        .btn-icon { padding: 0.4rem; border-radius: 6px; font-size: 0.9rem; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
+
+        /* ====== MOBILE FIXES ====== */
         @media (max-width: 768px) {
-            header { padding: 0.5rem; } .brand { font-size: 0.95rem; } .brand span { display: none; } .btn-scan span { display: none; } .btn-secondary span { display: none; }
-            main { padding: 0.75rem; } .card { padding: 0.75rem; } .search-input { font-size: 16px; } table { font-size: 0.85rem; } th, td { padding: 0.5rem 0.5rem; }
+            header { padding: 0.5rem; }
+            .brand { font-size: 0.95rem; } .brand span { display: none; }
+            .btn-scan span { display: none; } .btn-secondary span { display: none; }
+            main { padding: 0.75rem; } .card { padding: 0.75rem; } .search-input { font-size: 16px; }
+
+            .table-container { border-radius: 8px; }
+            /* KEY FIX: table-layout:fixed forces wrapping and prevents Action column from being pushed off */
+            table { font-size: 0.85rem; table-layout: fixed; width: 100%; }
+            th, td { padding: 0.5rem 0.4rem; vertical-align: middle; }
+
+            /* Fixed column widths so Action buttons always fit */
+            th:nth-child(1), td:nth-child(1) { width: 28%; word-wrap: break-word; overflow-wrap: break-word; white-space: normal; } /* Barcode */
+            th:nth-child(2), td:nth-child(2) { width: 30%; word-wrap: break-word; overflow-wrap: break-word; white-space: normal; } /* Product */
+            th:nth-child(3), td:nth-child(3) { width: 15%; white-space: nowrap; } /* Price */
+            th:nth-child(4), td:nth-child(4) { width: 27%; text-align: right; } /* Action */
+
             .quick-add-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; } .quick-add-grid > div:first-child { grid-column: 1 / -1; } .quick-add-grid button:last-child { grid-column: 1 / -1; }
-            .product-result .name { font-size: 1.1rem; } .product-result .price { font-size: 1.8rem; } button { padding: 0.5rem 0.75rem; font-size: 0.85rem; } .btn-qty { padding: 0.4rem 0.5rem; min-width: 36px; min-height: 36px; }
+            .product-result .name { font-size: 1.1rem; } .product-result .price { font-size: 1.8rem; }
+            button { padding: 0.5rem 0.75rem; font-size: 0.85rem; }
+            .btn-qty { padding: 0.4rem 0.5rem; min-width: 36px; min-height: 36px; }
+            .btn-icon { padding: 0.45rem; font-size: 1rem; min-width: 34px; min-height: 34px; }
         }
     </style>
 </head>
@@ -414,7 +138,7 @@ Here is the fully functional and complete code:
             </div>
             <div class="table-container">
                 <table>
-                    <thead><tr><th>Barcode</th><th>Product</th><th>Price</th><th>Action</th></tr></thead>
+                    <thead><tr><th>Barcode</th><th>Product</th><th>Price</th><th style="text-align:right;">Actions</th></tr></thead>
                     <tbody id="product-list"></tbody>
                 </table>
                 <div id="no-results" style="display:none;text-align:center;padding:2rem;color:var(--secondary);"><i class="fa-solid fa-box-open" style="font-size:3rem;margin-bottom:1rem;"></i><p>No products found</p></div>
@@ -441,6 +165,7 @@ Here is the fully functional and complete code:
         </div>
     </main>
 
+    <!-- Scanner Modal -->
     <div id="scanner-modal" class="modal">
         <div class="modal-content">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
@@ -460,6 +185,7 @@ Here is the fully functional and complete code:
         </div>
     </div>
 
+    <!-- Edit Modal -->
     <div id="edit-modal" class="modal">
         <div class="modal-content">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
@@ -479,129 +205,44 @@ Here is the fully functional and complete code:
     <div id="toast" class="toast"></div>
 
     <script>
-        const newProducts = [
-            { code: "123", name: "Gulistan walnut kernel 500g", price: 15.49, qty: 1 },
-            { code: "229997", name: "APRICOT 400GR", price: 6.99, qty: 1 },
-            { code: "20210472", name: "Atlas salted peanut 400g", price: 6.99, qty: 2 },
-            { code: "20250454", name: "Atlas Iranian roasted pistachio 400g", price: 14.99, qty: 1 },
-            { code: "89785464", name: "Gulistan white sugar 2kg", price: 6.99, qty: 1 },
-            { code: "567657567", name: "Gulistan pumpkin pepita 500g", price: 8.49, qty: 1 },
-            { code: "4160678590107", name: "Alvita coconut biscuit", price: 3.49, qty: 1 },
-            { code: "3218731741247", name: "Mumtaz trail mix 400g", price: 7.99, qty: 1 },
-            { code: "6260031022035", name: "Sehat olive shampoo", price: 4.49, qty: 2 },
-            { code: "9339358004011", name: "Vinegar sunflower seed", price: 4.99, qty: 1 },
-            { code: "817150258799", name: "AFG raw almond 500g", price: 10.99, qty: 1 },
-            { code: "9339358004172", name: "Raw chickpeas large 1kg", price: 6.49, qty: 1 },
-            { code: "9339358000655", name: "Red henna", price: 5.99, qty: 1 },
-            { code: "9339358000662", name: "Black henna", price: 5.99, qty: 1 },
-            { code: "9339358004103", name: "Honey sohan", price: 16.49, qty: 1 },
-            { code: "4421000224221", name: "Sesame crunchy snack", price: 5.50, qty: 1 },
-            { code: "827150249253", name: "AFG sunflower kernels 400g", price: 4.49, qty: 1 },
-            { code: "6212851204207", name: "Mumtaz Roasted & salted pistachio 500g", price: 13.99, qty: 1 },
-            { code: "4822115141241", name: "Mumtaz trail mix 400g", price: 7.99, qty: 1 },
-            { code: "6261149057254", name: "Collection chocolate gift pack", price: 14.99, qty: 1 },
-            { code: "6526485325", name: "Gulistan Vietnam cashews 700g", price: 15.99, qty: 1 },
-            { code: "45242253789", name: "Gulistan afghani palawi raisins 1kg", price: 11.99, qty: 1 },
-            { code: "9710015225596", name: "Cheetos puffs party bag 165g", price: 5.99, qty: 1 },
-            { code: "7159125397144", name: "Atlas saffron colour 150g", price: 5.49, qty: 1 },
-            { code: "719006530687", name: "Atlas wheat starch 500G", price: 3.49, qty: 1 },
-            { code: "6260812003482", name: "Nadi coconut bar", price: 8.49, qty: 1 },
-            { code: "9780218642292", name: "DSN sugar cubes", price: 2.99, qty: 1 },
-            { code: "719006532117", name: "Atlas baking powder 250g", price: 3.49, qty: 1 },
-            { code: "3577466931911", name: "Roshan corn oil 5L", price: 20.99, qty: 1 },
-            { code: "726436671033", name: "Whole cloves 100g", price: 4.49, qty: 1 },
-            { code: "726436670364", name: "Baharatchi cinnamon powder 100g", price: 2.99, qty: 1 },
-            { code: "726436671378", name: "Baharatchi garlic crushed 200g", price: 2.99, qty: 1 },
-            { code: "36548798541", name: "Gulistan Raw Australian Almond 500g", price: 9.99, qty: 1 },
-            { code: "794712654186", name: "Torshak tamarind lunex", price: 5.99, qty: 1 },
-            { code: "6260053183714", name: "Cheetoz pipe snack", price: 2.99, qty: 1 },
-            { code: "794712655725", name: "Masala pilaf spice", price: 5.99, qty: 1 },
-            { code: "794712655282", name: "Yogurt seasoning", price: 5.99, qty: 1 },
-            { code: "781021009059", name: "Alwazah green tea 200g", price: 6.49, qty: 1 },
-            { code: "719008133305", name: "Atlas amchur powder 200g", price: 2.49, qty: 1 },
-            { code: "8936010530003", name: "Aj green tea 800g", price: 12.99, qty: 1 },
-            { code: "8964001257578", name: "Atlas Roasted vermicelli", price: 0.99, qty: 1 },
-            { code: "352994000222", name: "Afghan Kabuli pulao 200g", price: 7.99, qty: 1 },
-            { code: "7278200236915", name: "Atlas grilled jalapeño pickles 640g", price: 3.99, qty: 1 },
-            { code: "8012529105151", name: "Mumtaz black jaggery 500g", price: 6.49, qty: 1 },
-            { code: "6260100389052", name: "Tak pottage macaroni 500g", price: 3.49, qty: 1 },
-            { code: "9310015248801", name: "Flaming hot Cheetoz 80g", price: 2.99, qty: 1 },
-            { code: "UNKNOWN", name: "Shan seekh kabab BBQ blend 500g", price: 5.99, qty: 1 },
-            { code: "8964001358091", name: "Hamdard ispaghol 100g", price: 6.99, qty: 1 },
-            { code: "8964000684078", name: "Gluco biscuits", price: 1.99, qty: 1 },
-            { code: "8964000684238", name: "Party pik biscuit", price: 1.99, qty: 1 },
-            { code: "609456734264", name: "Choco chum", price: 1.99, qty: 1 },
-            { code: "4294264013920", name: "Indomie spicy noodles", price: 3.99, qty: 1 },
-            { code: "8964003729004", name: "Dawn peshawari kahwa tea bags", price: 5.99, qty: 1 },
-            { code: "671866277518", name: "Korean spicy noodles", price: 1.99, qty: 1 },
-            { code: "725765614148", name: "Young's desi ghee 900g", price: 19.99, qty: 1 },
-            { code: "8961014024456", name: "Knorr chilli & garlic sauce 800g", price: 5.49, qty: 1 },
-            { code: "809456774585", name: "Riwayat desi ghee 1.6kg", price: 39.99, qty: 1 }
-        ];
-
-        /* rawTextData is maintained exactly as is inside the app for initial seeding if the database is empty */
-        const rawTextData = `+B+A+GV BAG $0.15\n0000 OMO 9KG $28.99\n00000 OMO 9KG $28.99\n0000000655122 Bag $0.15\n000011226 AFG JALGHOZA 350GR $29.99\n00110013 RAW ALMOND KG $11.50\n00201050 Sohan 470gr $14.99\n00652971 CHANA DAL 1KG $4.49\n016061009101003 Fruit Roil $2.50\n016223038376006 Werosv $0.00\n016223038376013 Merosa Chocolate $14.99\n016230011450007 Bisfit $3.99\n016241094482000 REX Milky Toffi 1kg $7.99\n016281002777002 Gaz $8.99\n016320003421000 Falfal Picale $4.49\n016722001476004 Sonhan Suya $2.85\n016722007265000 SOYPAK $2.99\n019365107439 SOUR FRUITY $5.50\n0283842 Gold $13.00\n032894030481 CHICK PEAS $2.50\n032894030511 Plain Fava Beans $2.50\n032894030788 Red Kidney Beans $2.50\n034000109432 Nutrageous $1.99\n038900001438 Pineapple Slices $4.99\n0400552862 Mazgi Green Tea $5.49\n044738018371 Coconut Milk $2.99\n046572802086 GUM $15.00\n050846932 Harmony Bitter Chocolate $12.99\n051532332886 Nutri Slim Tea $5.99\n054881001632 Deylo Tea $7.99\n054881004787 Ahmad Green Tea $7.99\n054881005913 Special Blend Tea $7.50\n054881005920 CARDAMOM TEA $8.49\n054881005951 AHMAD GREY TEA $7.99\n054881008570 AHMAD GREEN TEA 500GR $12.99\n054881009737 Ahmad Tea $12.99\n059212102620 Catring Steam Table $3.96\n059212102644 Catering Steam Table $2.99\n0619988379123 Vaccum Jug 0.75lt $14.99\n070330600065 Bic Lighter $2.99\n070330600072 Smal Lighter $2.49\n070847813903 Monster 500ml $4.99\n073390000110 MENTOS $2.49\n073390000127 MENTOS $2.49\n073390000165 MENTOS $2.49\n073854008089 Playing Cards $9.50\n0744109794001 Wild Rue Seed $4.50\n0744109795985 Dried Figs Aas 400g $9.99\n0783150 Dr Prpper 335ml $3.50\n0789530 Dr Pepper $3.49\n089686010947 Mygoreng $1.00\n089686171686 Indomie Noodle 5pack $3.99\n089686180640 Si $3.99\n089686180657 NOODLES CUP $2.50\n092300080097 Mumtaz 100g Cardamom $8.50\n092300800978 Cardamom 100gr $8.50\n092322539412 Rolled Apricot 500g $8.49\n09555052070026 Hecham Corn Oil 20L $69.99\n096619363858 Kirikland Water $1.99\n100 MISC $0.00\n10089686010944 Mi Goreng $17.50\n10102 Lang Green Raisins 500gr $8.99\n1012 Salted Pistachio 500gr $11.99\n1019B Long Green Ratsins 500gr $7.99\n1023 Kudi Mulbery 500gr $7.99\n1070906051801 1 Pc Glassware $4.99\n1070906541128 New Morning 6 X $7.99\n1070980050080 Aqua 6 Pieces Set $10.99\n11111115 PARAK FIG 500GR $17.50\n11122524 WALNUT 500GR $8.99\n112 Walnut 500gr $8.99\n11222552 JALGHOZA 400 GR $35.00\n112587 Russian Olive 350 Gr $4.99\n11564333Q Sweet Apricot $7.50\n115643K Sour Apricot $6.99\n1156543 SOUR DR APRICOT 400 GR $6.99\n116439023636000 Mojalal 1000m $6.99\n116439072293000 Table Cloth 450g $4.99\n116688U Green Raisins 500gr $9.99\n11669661 Salted Pistachio 500gr $13.99\n11669777 Afghan Almond $14.00\n11669937 SWEET APRCOT500GR $7.99\n116921042301000 Mojlah Table Cloth 2kg $9.49\n12121229 Cardamom 100gr $8.50\n12123216 APRECOT KERNAL500GR $8.99\n1220000060005 Mother Energy Drink $4.49\n1220000060128 Mother 500 Ml $4.49\n1220000060395 Mother Energ Drrink $0.00\n1220000060401 Mother 500ml $4.50\n1220000061200 MOTHER ENERGY $4.49\n1220000061521 Mather 500ml $4.49\n1220000062009 Mother Bulu $4.49\n1220000062306 Mother Razzle Berry 500ml $3.99\n1220000062900 Mother High Coffee $4.50\n1220000063013 MOTHER $4.50\n1220000063334 Mother Watermelon $4.50\n12345540 Afg Dry Yogart $9.49\n12345678 Paper Straw $4.99\n12365418 AFG FIG 450GR $13.99\n12398 GREEN RAISINS 500GR $10.49\n1297319027937 Satarbayee Almond $13.50\n1358946340070 Color Flavored Vermicelli $2.50\n1363013765588 Sour Apricot 500g $7.50\n1458621485208 Walnut Kernel 800g $13.99\n15162007 WALNUT 500GR $12.49\n15166661 BLACK MULBERRY 400GR $7.99\n1534651646991 40cm $19.99\n184363000010 Cake Rusk 840g $8.99\n188552000188 COCOMO 24PACK $4.99\n18857129076244 Aj Basil Seed 6pack $6.99\n18857129076268 Basil Seed Passionfruit 6pack $6.99\n18857129076282 Aj Basil Seed Watermelon 6pack $6.99\n18857129076299 Basil Seed Peach 6pack $6.99\n18859881300438 Basil Seed Blueberry 6pack $6.99\n18859881300445 Basil Seed Pineapple $6.99\n1911820223755 Gift Bag $2.50\n1911820711542 Gift Bag $2.50\n1911830030435 Small Bbq $2.99\n1911830096585 Siv $8.50\n1911830510807 Foil Trays $2.49\n19310082426635 Corn 15 Pack $28.00\n2012110800041 Fruit Salad Bowl $4.99\n20200060 CARDAMOM POWDER 100GR $8.99\n20200084 GINGER FLAKE 200GR $5.50\n20200107 Saffron Pumpkin Seed Roasted &salted 350g $5.99\n20200114 Corn 1kg $4.49\n20200121 Chili Toasred Cotn 400gr $5.99\n20200138 Bbq Toasted Corn 400gr $4.99\n20200169 FARAK FIG 400GR $12.99\n20200206 Green Sultana 500g $6.99\n20200268 Sun Seet $5.50\n20200305 Plain Flour $3.99\n20200312 Wholemeal Flouf 1kg $4.99\n20200343 Long Green Sultana 400 G $7.99\n20200374 Rolled Apricot $7.49\n20200398 Sour Dried Apricot 400g $5.99\n20200480 PUMPKIN SEED 300GR $7.49\n20200503 Ginger Toffee 900gr $6.99\n20200510 Small Red Beans $5.49\n20200527 Sunfower Seed Roasted $7.99\n20200558 BROKEN RICE 1KG $4.49\n20202088 Red Raisin 500gr $7.49\n20202095 Green Raisin Girdak 500gr $7.99\n20204 RED RAISINS 500GR $7.49\n20210021 Russian Olive 300gr $5.99\n20210038 Caramel Toffee 900gr $6.99\n20210045 Dark Toffee $7.50\n20210069 GINGER TOFFEE $7.51\n20210090 Soybeans 200g $2.49\n20210113 Mint Toffee 900gr $6.99\n20210120 Pumpkin Seed 300gr $5.99\n20210175 Barley Flour $4.49\n20210199 SUNFLOWER SEET 700GR $7.99\n20210205 MELON SEEDS 400GR $8.49\n20210229 Pine Nut 100gr $6.50\n20210236 Raw Peanut 1kg $7.49\n20210243 PEANUT IN SHELL 400GR $6.50\n20210250 Light Coriander Seed 250g $4.49\n20210267 FRUIT TOFFE $7.50\n20210281 Turkish Chickpeas $7.99\n20210298 DRIED OREGANO $4.99\n20210304 Turkish Pisracho $13.50\n20210434 PUMPKIN SEED 400GR $7.50\n20210472 SALTED PEANUT 400GR $6.99\n20210489 SUGAR CHICKPEAS $6.99\n20210496 PUMPKING SEED 400GR $7.50\n20210502 COLORED SUGAR CHEE $6.99\n20210540 Skinless Wheat 1kg $3.99\n20220020 HIBISCUP FLOWER $4.49\n20220037 CHICKPEAS 1KG $5.99\n20220044 CHICKPEAS 2KG $10.99\n20220051 Medium Chickpeas 5kg $23.50\n20220112 Raw Walnut $13.99\n20220150 Pistacho Powder $5.99\n20220211 Chilli Lemon Almond 400gr $9.50\n20220235 CHILLI LIME CASHEW 4OOGR $11.99\n20220273 GORN $5.00\n20220280 Cheese Corn $5.99\n20220396 Yellow Sour Plum $6.99\n20220402 Australian Raw Pistachio $12.49\n20230043 Bbq Toasted Corn $5.99\n20230067 DRY MARSH FL $3.99\n20230081 Fruity Pomp Adour Candy $7.99\n20230128 Honey Pomp Adour Candy $7.99\n20230166 HALILA SIAH200GR $5.99\n20230197 COARSE BREAD CRUMBS 500GR $3.99\n20230265 Lemon Pistachio $14.99\n20230296 Pink Salt $3.50\n20230319 TASTY MIXED NUTS 350GR $8.50\n20230326 SAFFRON CASHEW 400GR $13.00\n20230340 Jumbo Red Data 400gr $7.49\n20230401 BBQ SOY CRISP $6.99\n20230418 Chili Lime Soy Crisp $6.99\n202320240805 Mango Pickles $5.99\n202320240940 Date Syrup $5.50\n2023202411011 CHICKPEAS SWEET 500GR $7.49\n202320242420 Strawrry $7.99\n202320242422 Hazelnut $7.99\n202320242424 Toffee $7.99\n202320242426 MILKY TOFFE800GR $7.99\n20240028 Usa Pistachi $11.50\n20240059 WOOD FIRE CHSHEW 400GR $12.49\n20240073 WHITE PUMPKIN SEED 400GR $7.99\n20240134 HOT PAPRIKA $4.99\n20240158 Hot Green Ghilli $4.50\n20240295 Roasted Peanut In Shell $5.50\n20241015 NATURAL POMEGRANTE JUICE $4.99\n20241016 Po J $1.99\n20241030 Mix Pickeld $4.49\n20250171 Salt $3.00\n20250188 RAW SUGAR 1KG $4.49\n20250324 Strawberry Marshmellow $3.49\n20250331 Mango Marshmllow $3.99\n20250348 Rainbow Twist Marshmellow $3.99\n20250355 Pink N White Marshmello $3.99\n20250362 Marshmellow $3.49\n20250379 Bbq Marshmellow $3.99\n20250386 Magical Fruity Noodles $2.50\n20250393 Magical Fried Egg $2.49\n2094285212157 Sweet Apricot $7.50\n21545221 Chicpeas 2k $7.49\n2156057190763 Vip $10.00\n22113337 Almond 700gr $8.99\n22114426 White Muelbury 500gr $9.99\n22114440 Light Muelbury 400gr $7.99\n22114464 Salted Pistachio 500gr $10.99\n22115225 ROND RAISN $7.99\n22211113 CHANA DAL 2KG $7.50\n22211136 SELLA RICE 2G $9.50\n22222237 WALNUT 500GR $9.49\n22222244 Pine Nuts Jalghuza 200gr $18.49\n22334428 Channa Dhall 1kg $3.49\n22334435 Chana Dhall 2kj $6.49\n22336699 SALTED PISTACHIO500GR $10.99\n224455M DRIED APRICOT 600GR $10.49\n22546982 Melberruy $9.99\n22554437 Red Beans 2k $7.99\n2255E Black Raisians 700 $9.99\n22566L Pistachio 500gr $11.49\n22669568 Logari Almand 500gr $21.99\n22669667 Casgew Vitnam 500gr $11.99\n22669988 Large Almond 2 500 Gr $13.49\n22669995 LARGE ALMOND 600GR $10.99\n229997 APRICOT 400GR $6.99\n232211144K GREEN RAISIN 500GR $10.49\n23456899 Charcoal 15kg $29.99\n2356222 LONG RAISINS 500GR $13.75\n2356222M Long Rains 700gr $16.99\n235655Q Jaggery $8.99\n23565616 Cranberry Beans 1kg $5.50\n23565623 REW ALMOND 900GR $10.99\n23565623W Raw Almond 900gr $10.99\n2369841015962 Sweet Almonds $9.50\n25435535 Lentis 2k $8.50\n25454550 FLOUR 1KG $3.49\n2545545 LIGHT KIDNET BEANS 2KG $8.50\n25544664 AUS SALTED PISTACHIO500GR $10.99\n255454511 WATANI ALMOND 500 GR $14.99\n255454554 L0GARY $17.50\n255454554$ LOGARY ALMOND 500GR $17.50\n25555547 PALAWE SULTANA 400GR $5.99\n2556543 SWEET DR APICOT 400GR $6.99\n2556543U SWEET APRICOT $6.99\n25885200 CARDAMOM 100GR $11.99\n25885330 BLACK RAISINS 500GR $7.49`;
-
         let inventory = {};
         let printQueue = {};
         let currentPage = 1;
         let html5QrCode = null;
         const perPage = 100;
 
+        // ===== SAFE ESCAPING HELPERS =====
+        // Escapes a string for safe use inside a JS single-quoted string within an HTML onclick attribute
+        function escJs(str) {
+            return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+        }
+        // Escapes a string for safe use as HTML text content (prevents XSS)
+        function escHtml(str) {
+            const d = document.createElement('div');
+            d.textContent = String(str);
+            return d.innerHTML;
+        }
+
+        // ===== STORAGE =====
         function saveQueueToStorage() { try { localStorage.setItem('gulistan_printQueue', JSON.stringify(printQueue)); } catch(e) {} }
         function loadQueueFromStorage() { try { const saved = localStorage.getItem('gulistan_printQueue'); if (saved) printQueue = JSON.parse(saved); } catch(e) { printQueue = {}; } }
 
-        function parseLine(line) {
-            const parts = line.trim().split(/\t+|\s{2,}/);
-            if (parts.length < 3) return null;
-            const barcode = parts[0].trim();
-            const name = parts[1].trim();
-            let priceStr = parts[2].trim();
-            if (!priceStr.startsWith('$')) { for (let i = 2; i < parts.length; i++) { if (parts[i].trim().startsWith('$')) { priceStr = parts[i].trim(); break; } } }
-            const price = parseFloat(priceStr.replace('$', ''));
-            if (!barcode || !name || isNaN(price)) return null;
-            return { barcode, name, price };
-        }
-
-        // Firebase Operations
+        // ===== FIREBASE =====
         async function loadProductsFromFirebase() {
-            document.getElementById('sync-status').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Loading Cloud...';
+            document.getElementById('sync-status').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Loading...';
             try {
                 const snapshot = await db.collection('products').get();
                 if (!snapshot.empty) {
                     snapshot.forEach(doc => { inventory[doc.id] = doc.data(); });
                     console.log('Loaded from Firebase:', Object.keys(inventory).length);
-                } else {
-                    console.log('Firebase empty, seeding data...');
-                    await seedInitialData();
                 }
             } catch (e) {
-                console.error('Firebase load failed, falling back to local parse.', e);
-                loadLocalProducts(); // Fallback
+                console.error('Firebase load failed.', e);
             }
             document.getElementById('sync-status').innerHTML = '<i class="fa-solid fa-cloud-check"></i> Synced';
             document.getElementById('sync-status').classList.add('synced');
             document.getElementById('total-products').textContent = Object.keys(inventory).length;
             render();
-        }
-
-        function loadLocalProducts() {
-            const lines = rawTextData.trim().split('\n');
-            lines.forEach(line => { const p = parseLine(line); if (p) inventory[p.barcode] = p; });
-            newProducts.forEach(p => inventory[p.code] = { barcode: p.code, name: p.name, price: p.price });
-        }
-
-        async function seedInitialData() {
-            loadLocalProducts(); // Parse local first
-            const batch = db.batch();
-            let count = 0;
-            Object.values(inventory).forEach(p => {
-                const ref = db.collection('products').doc(p.barcode);
-                batch.set(ref, p);
-                count++;
-            });
-            await batch.commit();
-            console.log('Seeded', count, 'products to Firebase.');
         }
 
         async function saveProductToFirebase(product) {
@@ -610,10 +251,11 @@ Here is the fully functional and complete code:
                 document.getElementById('sync-status').innerHTML = '<i class="fa-solid fa-cloud-check"></i> Synced';
             } catch(e) {
                 console.error('Failed to save to Firebase', e);
-                document.getElementById('sync-status').innerHTML = '<i class="fa-solid fa-cloud-exclamation"></i> Sync Error';
+                document.getElementById('sync-status').innerHTML = '<i class="fa-solid fa-cloud-exclamation"></i> Error';
             }
         }
 
+        // ===== RENDER PRODUCT TABLE =====
         function render() {
             const tbody = document.getElementById('product-list');
             const products = Object.values(inventory);
@@ -621,13 +263,24 @@ Here is the fully functional and complete code:
             const show = products.slice(0, end);
             tbody.innerHTML = '';
             document.getElementById('no-results').style.display = show.length ? 'none' : 'block';
+
             show.forEach(p => {
                 const tr = document.createElement('tr');
-                tr.innerHTML = `<td>${p.barcode}</td><td>${p.name}</td><td class="price-tag">$${p.price.toFixed(2)}</td><td>
-                    <button class="btn-secondary" onclick="openEdit('${p.barcode}')" style="padding:0.25rem 0.5rem;font-size:0.8rem;margin-right:0.25rem"><i class="fa-solid fa-edit"></i></button>
-                    <button class="btn-primary" onclick="addQueue('${p.barcode}')" style="padding:0.25rem 0.5rem;font-size:0.8rem"><i class="fa-solid fa-plus"></i></button></td>`;
+                // Use data-barcode on the row so event delegation can find it
+                tr.dataset.barcode = p.barcode;
+                tr.innerHTML = `
+                    <td title="${escHtml(p.barcode)}">${escHtml(p.barcode)}</td>
+                    <td title="${escHtml(p.name)}">${escHtml(p.name)}</td>
+                    <td class="price-tag">$${p.price.toFixed(2)}</td>
+                    <td style="text-align:right;">
+                        <div class="action-btns" style="justify-content:flex-end;">
+                            <button class="btn-secondary btn-icon" data-action="edit" data-barcode="${escHtml(p.barcode)}" title="Edit Price"><i class="fa-solid fa-pen"></i></button>
+                            <button class="btn-primary btn-icon" data-action="add" data-barcode="${escHtml(p.barcode)}" title="Add to Queue"><i class="fa-solid fa-plus"></i></button>
+                        </div>
+                    </td>`;
                 tbody.appendChild(tr);
             });
+
             document.getElementById('showing-products').textContent = show.length;
             const container = document.getElementById('show-more-container');
             container.innerHTML = '';
@@ -640,34 +293,106 @@ Here is the fully functional and complete code:
             }
         }
 
+        // ===== EVENT DELEGATION for product table =====
+        document.addEventListener('click', function(e) {
+            const btn = e.target.closest('[data-action]');
+            if (!btn) return;
+            const barcode = btn.dataset.barcode;
+            if (!barcode) return;
+            if (btn.dataset.action === 'edit') { openEdit(barcode); }
+            if (btn.dataset.action === 'add') { addQueue(barcode); }
+        });
+
+        // ===== SEARCH =====
         function handleSearch() {
             const q = document.getElementById('search-input').value.toLowerCase().trim();
             if (!q) { currentPage = 1; render(); return; }
-            const filtered = Object.values(inventory).filter(p => p.barcode.toLowerCase().includes(q) || p.name.toLowerCase().includes(q));
-            const tbody = document.getElementById('product-list'); tbody.innerHTML = '';
+            const filtered = Object.values(inventory).filter(p =>
+                p.barcode.toLowerCase().includes(q) || p.name.toLowerCase().includes(q)
+            );
+            const tbody = document.getElementById('product-list');
+            tbody.innerHTML = '';
             document.getElementById('show-more-container').innerHTML = '';
-            if (!filtered.length) { document.getElementById('no-results').style.display = 'block'; document.getElementById('showing-products').textContent = '0'; return; }
+            if (!filtered.length) {
+                document.getElementById('no-results').style.display = 'block';
+                document.getElementById('showing-products').textContent = '0';
+                return;
+            }
             document.getElementById('no-results').style.display = 'none';
             const show = filtered.slice(0, 200);
             show.forEach(p => {
                 const tr = document.createElement('tr');
-                tr.innerHTML = `<td>${p.barcode}</td><td>${p.name}</td><td class="price-tag">$${p.price.toFixed(2)}</td><td><button class="btn-primary" onclick="addQueue('${p.barcode}')" style="padding:0.25rem 0.5rem;font-size:0.8rem"><i class="fa-solid fa-plus"></i></button></td>`;
+                tr.innerHTML = `
+                    <td title="${escHtml(p.barcode)}">${escHtml(p.barcode)}</td>
+                    <td title="${escHtml(p.name)}">${escHtml(p.name)}</td>
+                    <td class="price-tag">$${p.price.toFixed(2)}</td>
+                    <td style="text-align:right;">
+                        <button class="btn-primary btn-icon" data-action="add" data-barcode="${escHtml(p.barcode)}" title="Add to Queue"><i class="fa-solid fa-plus"></i></button>
+                    </td>`;
                 tbody.appendChild(tr);
             });
             document.getElementById('showing-products').textContent = show.length;
         }
 
-        function addQueue(barcode) { const p = inventory[barcode]; if (!p) return; if (printQueue[barcode]) printQueue[barcode].qty++; else printQueue[barcode] = { ...p, qty: 1 }; updateQueue(); toast('Added: ' + p.name); }
-        function updateQueue() {
-            const tbody = document.getElementById('queue-list'); tbody.innerHTML = ''; let total = 0;
-            Object.entries(printQueue).forEach(([code, item]) => { total += item.qty; tbody.innerHTML += `<tr><td><small>${code}</small><br><b>${item.name}</b></td><td>$${item.price.toFixed(2)}</td><td><div class="qty-controls"><button class="btn-secondary btn-qty" onclick="chgQty('${code}',-1)">-</button><input class="qty-input" value="${item.qty}" readonly><button class="btn-secondary btn-qty" onclick="chgQty('${code}',1)">+</button></div></td><td>$${(item.price * item.qty).toFixed(2)}</td><td><button class="btn-danger" onclick="delQueue('${code}')" style="padding:0.25rem"><i class="fa-solid fa-trash"></i></button></td></tr>`; });
-            document.getElementById('queue-count').textContent = total; saveQueueToStorage();
+        // ===== QUEUE =====
+        function addQueue(barcode) {
+            const p = inventory[barcode];
+            if (!p) return;
+            if (printQueue[barcode]) printQueue[barcode].qty++;
+            else printQueue[barcode] = { ...p, qty: 1 };
+            updateQueue();
+            toast('Added: ' + p.name);
         }
-        function chgQty(code, d) { if (printQueue[code]) { printQueue[code].qty += d; if (printQueue[code].qty <= 0) delete printQueue[code]; updateQueue(); } }
+
+        function updateQueue() {
+            const tbody = document.getElementById('queue-list');
+            tbody.innerHTML = '';
+            let total = 0;
+            Object.entries(printQueue).forEach(([code, item]) => {
+                total += item.qty;
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><small>${escHtml(code)}</small><br><b>${escHtml(item.name)}</b></td>
+                    <td>$${item.price.toFixed(2)}</td>
+                    <td>
+                        <div class="qty-controls">
+                            <button class="btn-secondary btn-qty" data-action="chgqty" data-barcode="${escHtml(code)}" data-delta="-1">-</button>
+                            <input class="qty-input" value="${item.qty}" readonly>
+                            <button class="btn-secondary btn-qty" data-action="chgqty" data-barcode="${escHtml(code)}" data-delta="1">+</button>
+                        </div>
+                    </td>
+                    <td>$${(item.price * item.qty).toFixed(2)}</td>
+                    <td><button class="btn-danger btn-icon" data-action="delqueue" data-barcode="${escHtml(code)}"><i class="fa-solid fa-trash"></i></button></td>`;
+                tbody.appendChild(tr);
+            });
+            document.getElementById('queue-count').textContent = total;
+            saveQueueToStorage();
+        }
+
+        // Event delegation for queue buttons
+        document.addEventListener('click', function(e) {
+            const btn = e.target.closest('[data-action="chgqty"]');
+            if (btn) { chgQty(btn.dataset.barcode, parseInt(btn.dataset.delta)); return; }
+            const delBtn = e.target.closest('[data-action="delqueue"]');
+            if (delBtn) { delQueue(delBtn.dataset.barcode); return; }
+        });
+
+        function chgQty(code, d) {
+            if (printQueue[code]) {
+                printQueue[code].qty += d;
+                if (printQueue[code].qty <= 0) delete printQueue[code];
+                updateQueue();
+            }
+        }
         function delQueue(code) { delete printQueue[code]; updateQueue(); toast('Removed'); }
         function clearQueue() { if (confirm('Clear all items?')) { printQueue = {}; localStorage.removeItem('gulistan_printQueue'); updateQueue(); toast('Queue cleared'); } }
-        function switchView(id) { document.querySelectorAll('.view').forEach(v => v.classList.remove('active')); document.getElementById(id).classList.add('active'); }
 
+        function switchView(id) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        // ===== ADD NEW PRODUCT =====
         function addNewProduct() {
             const barcode = document.getElementById('new-barcode').value.trim();
             const name = document.getElementById('new-name').value.trim();
@@ -675,38 +400,94 @@ Here is the fully functional and complete code:
             if (!barcode || !name || isNaN(price)) { toast('Fill all fields'); return; }
             const product = { barcode, name, price };
             inventory[barcode] = product;
-            saveProductToFirebase(product); // Save directly to online database
+            saveProductToFirebase(product);
             addQueue(barcode);
-            document.getElementById('new-barcode').value = ''; document.getElementById('new-name').value = ''; document.getElementById('new-price').value = '';
-            render(); toast('Added & Synced: ' + name);
+            document.getElementById('new-barcode').value = '';
+            document.getElementById('new-name').value = '';
+            document.getElementById('new-price').value = '';
+            render();
+            toast('Added & Synced: ' + name);
         }
 
-        function openEdit(barcode) { const p = inventory[barcode]; if (!p) return; document.getElementById('edit-barcode').value = p.barcode; document.getElementById('edit-name').value = p.name; document.getElementById('edit-price').value = p.price; document.getElementById('edit-modal').classList.add('active'); }
+        // ===== EDIT =====
+        function openEdit(barcode) {
+            const p = inventory[barcode];
+            if (!p) return;
+            document.getElementById('edit-barcode').value = p.barcode;
+            document.getElementById('edit-name').value = p.name;
+            document.getElementById('edit-price').value = p.price;
+            document.getElementById('edit-modal').classList.add('active');
+        }
         function closeEditModal() { document.getElementById('edit-modal').classList.remove('active'); }
         function saveEdit() {
-            const barcode = document.getElementById('edit-barcode').value; const price = parseFloat(document.getElementById('edit-price').value);
+            const barcode = document.getElementById('edit-barcode').value;
+            const price = parseFloat(document.getElementById('edit-price').value);
             if (inventory[barcode] && !isNaN(price)) {
-                inventory[barcode].price = price; if (printQueue[barcode]) printQueue[barcode].price = price;
-                saveProductToFirebase(inventory[barcode]); // Update online database
+                inventory[barcode].price = price;
+                if (printQueue[barcode]) printQueue[barcode].price = price;
+                saveProductToFirebase(inventory[barcode]);
                 render(); updateQueue(); closeEditModal(); toast('Updated & Synced');
             }
         }
 
+        // ===== SCANNER =====
         let scannerMode = 'search';
-        function openScanner() { scannerMode = 'search'; document.getElementById('scanner-modal').classList.add('active'); document.getElementById('scan-result').innerHTML = ''; document.getElementById('manual-barcode').value = ''; startCamera(); }
-        function openScannerForNewProduct() { scannerMode = 'new-product'; document.getElementById('scanner-modal').classList.add('active'); document.getElementById('scan-result').innerHTML = ''; document.getElementById('manual-barcode').value = ''; startCamera(); }
-        function closeScanner() { stopCamera(); document.getElementById('scanner-modal').classList.remove('active'); scannerMode = 'search'; }
+        function openScanner() {
+            scannerMode = 'search';
+            document.getElementById('scanner-modal').classList.add('active');
+            document.getElementById('scan-result').innerHTML = '';
+            document.getElementById('manual-barcode').value = '';
+            startCamera();
+        }
+        function openScannerForNewProduct() {
+            scannerMode = 'new-product';
+            document.getElementById('scanner-modal').classList.add('active');
+            document.getElementById('scan-result').innerHTML = '';
+            document.getElementById('manual-barcode').value = '';
+            startCamera();
+        }
+        function closeScanner() {
+            stopCamera();
+            document.getElementById('scanner-modal').classList.remove('active');
+            scannerMode = 'search';
+        }
 
         function startCamera() {
             html5QrCode = new Html5Qrcode("reader");
             const config = { fps: 120, qrbox: { width: 200, height: 100 } };
             html5QrCode.start({ facingMode: "environment" }, config, (decodedText) => {
-                html5QrCode.stop().then(() => { document.getElementById('scanning-status').style.display = 'none'; if (scannerMode === 'new-product') { document.getElementById('new-barcode').value = decodedText.trim(); closeScanner(); document.getElementById('new-name').focus(); toast('Barcode scanned'); } else { handleBarcode(decodedText); } }).catch(err => console.log('Stop error:', err));
-            }, () => {}).then(() => { document.getElementById('scanning-status').style.display = 'flex'; }).catch(err => { document.getElementById('reader').innerHTML = '<div style="padding:2rem;text-align:center;color:#fff;">Camera not available. Use manual entry.</div>'; });
+                html5QrCode.stop().then(() => {
+                    document.getElementById('scanning-status').style.display = 'none';
+                    if (scannerMode === 'new-product') {
+                        document.getElementById('new-barcode').value = decodedText.trim();
+                        closeScanner();
+                        document.getElementById('new-name').focus();
+                        toast('Barcode scanned');
+                    } else {
+                        handleBarcode(decodedText);
+                    }
+                }).catch(err => {});
+            }, () => {}).then(() => {
+                document.getElementById('scanning-status').style.display = 'flex';
+            }).catch(err => {
+                document.getElementById('reader').innerHTML = '<div style="padding:2rem;text-align:center;color:#fff;">Camera not available. Use manual entry.</div>';
+            });
         }
         function stopCamera() { if (html5QrCode && html5QrCode.isScanning) html5QrCode.stop().catch(err => {}); }
 
-        function handleManualScan() { const barcode = document.getElementById('manual-barcode').value.trim(); if (barcode) { if (scannerMode === 'new-product') { document.getElementById('new-barcode').value = barcode; closeScanner(); document.getElementById('new-name').focus(); } else { handleBarcode(barcode); } } }
+        function handleManualScan() {
+            const barcode = document.getElementById('manual-barcode').value.trim();
+            if (barcode) {
+                if (scannerMode === 'new-product') {
+                    document.getElementById('new-barcode').value = barcode;
+                    closeScanner();
+                    document.getElementById('new-name').focus();
+                } else {
+                    handleBarcode(barcode);
+                }
+            }
+        }
+
         function handleBarcode(barcode) {
             barcode = barcode.trim();
             if (inventory[barcode]) { showProductFound(inventory[barcode]); addQueue(barcode); return; }
@@ -716,66 +497,159 @@ Here is the fully functional and complete code:
         }
 
         function findSmartMatches(barcode) {
-            const results = []; const cleanBarcode = barcode.replace(/\D/g, '');
-            for (let key in inventory) { const p = inventory[key]; const cleanKey = key.replace(/\D/g, ''); if (key === barcode) { results.unshift(p); continue; } if (cleanBarcode && cleanKey && (cleanKey.includes(cleanBarcode) || cleanBarcode.includes(cleanKey))) { results.push(p); continue; } if (results.length >= 5) break; }
+            const results = [];
+            const cleanBarcode = barcode.replace(/\D/g, '');
+            for (let key in inventory) {
+                const p = inventory[key];
+                const cleanKey = key.replace(/\D/g, '');
+                if (key === barcode) { results.unshift(p); continue; }
+                if (cleanBarcode && cleanKey && (cleanKey.includes(cleanBarcode) || cleanBarcode.includes(cleanKey))) { results.push(p); continue; }
+                if (results.length >= 5) break;
+            }
             return results;
         }
 
         function showProductFound(product, moreCount = 0) {
             const resultDiv = document.getElementById('scan-result');
-            resultDiv.innerHTML = `<div class="product-result"><div class="name">${product.name}</div><div class="price">$${product.price.toFixed(2)}</div><div class="barcode-img"><svg id="result-barcode"></svg></div><div class="barcode">${product.barcode}</div>${moreCount > 0 ? `<div style="color:var(--secondary);font-size:0.85rem;margin-top:0.5rem;">+${moreCount} more matches</div>` : ''}</div><div style="margin-top:1rem;display:flex;gap:0.5rem;"><button class="btn-primary" onclick="addQueue('${product.barcode}');toast('Added more');" style="flex:1;"><i class="fa-solid fa-plus"></i> Add Another</button><button class="btn-secondary" onclick="continueScanning()" style="flex:1;"><i class="fa-solid fa-camera"></i> Scan Next</button></div>`;
-            setTimeout(() => { try { JsBarcode("#result-barcode", product.barcode, { width: 2, height: 50, displayValue: false, margin: 5 }); } catch(e) { document.getElementById('result-barcode').outerHTML = `<div style="font-family:monospace;">${product.barcode}</div>`; } }, 100);
+            const safeBarcode = escHtml(product.barcode);
+            const safeName = escHtml(product.name);
+            const safeBarcodeJs = escJs(product.barcode);
+            resultDiv.innerHTML = `
+                <div class="product-result">
+                    <div class="name">${safeName}</div>
+                    <div class="price">$${product.price.toFixed(2)}</div>
+                    <div class="barcode-img"><svg id="result-barcode"></svg></div>
+                    <div class="barcode">${safeBarcode}</div>
+                    ${moreCount > 0 ? `<div style="color:var(--secondary);font-size:0.85rem;margin-top:0.5rem;">+${moreCount} more matches</div>` : ''}
+                </div>
+                <div style="margin-top:1rem;display:flex;gap:0.5rem;">
+                    <button class="btn-primary" onclick="addQueue('${safeBarcodeJs}');toast('Added more');" style="flex:1;"><i class="fa-solid fa-plus"></i> Add Another</button>
+                    <button class="btn-secondary" onclick="continueScanning()" style="flex:1;"><i class="fa-solid fa-camera"></i> Scan Next</button>
+                </div>`;
+            setTimeout(() => {
+                try {
+                    JsBarcode("#result-barcode", product.barcode, { width: 2, height: 50, displayValue: false, margin: 5 });
+                } catch(e) {
+                    document.getElementById('result-barcode').outerHTML = `<div style="font-family:monospace;">${safeBarcode}</div>`;
+                }
+            }, 100);
         }
 
         function showNotFound(barcode) {
             const resultDiv = document.getElementById('scan-result');
-            resultDiv.innerHTML = `<div class="not-found"><div class="icon"><i class="fa-solid fa-exclamation-circle"></i></div><div style="font-weight:600;margin-bottom:0.5rem;">Product Not Found</div><div style="font-family:monospace;background:#fff;padding:0.5rem;border-radius:4px;margin-bottom:1rem;">${barcode}</div></div><div style="margin-top:1rem;"><p style="font-weight:600;margin-bottom:0.5rem;">Add New Product:</p><div style="display:flex;flex-direction:column;gap:0.5rem;"><input type="text" id="scan-new-name" placeholder="Product Name" style="padding:0.75rem;border:2px solid var(--border);border-radius:8px;"><input type="number" id="scan-new-price" placeholder="Price ($)" step="0.01" style="padding:0.75rem;border:2px solid var(--border);border-radius:8px;"><button class="btn-primary" onclick="saveScannedProduct('${barcode}')"><i class="fa-solid fa-save"></i> Save & Add</button></div></div>`;
+            const safeBarcode = escHtml(barcode);
+            const safeBarcodeJs = escJs(barcode);
+            resultDiv.innerHTML = `
+                <div class="not-found">
+                    <div class="icon"><i class="fa-solid fa-exclamation-circle"></i></div>
+                    <div style="font-weight:600;margin-bottom:0.5rem;">Product Not Found</div>
+                    <div style="font-family:monospace;background:#fff;padding:0.5rem;border-radius:4px;margin-bottom:1rem;">${safeBarcode}</div>
+                </div>
+                <div style="margin-top:1rem;">
+                    <p style="font-weight:600;margin-bottom:0.5rem;">Add New Product:</p>
+                    <div style="display:flex;flex-direction:column;gap:0.5rem;">
+                        <input type="text" id="scan-new-name" placeholder="Product Name" style="padding:0.75rem;border:2px solid var(--border);border-radius:8px;">
+                        <input type="number" id="scan-new-price" placeholder="Price ($)" step="0.01" style="padding:0.75rem;border:2px solid var(--border);border-radius:8px;">
+                        <button class="btn-primary" onclick="saveScannedProduct('${safeBarcodeJs}')"><i class="fa-solid fa-save"></i> Save & Add</button>
+                    </div>
+                </div>`;
         }
 
         function saveScannedProduct(barcode) {
-            const name = document.getElementById('scan-new-name').value.trim(); const price = parseFloat(document.getElementById('scan-new-price').value);
+            const name = document.getElementById('scan-new-name').value.trim();
+            const price = parseFloat(document.getElementById('scan-new-price').value);
             if (!name || isNaN(price)) { toast('Enter name and price'); return; }
             const product = { barcode, name, price };
             inventory[barcode] = product;
-            saveProductToFirebase(product); // Save directly to online database
+            saveProductToFirebase(product);
             addQueue(barcode); render(); closeScanner(); toast('Saved & Synced: ' + name);
         }
 
-        function continueScanning() { document.getElementById('scan-result').innerHTML = ''; document.getElementById('manual-barcode').value = ''; startCamera(); }
+        function continueScanning() {
+            document.getElementById('scan-result').innerHTML = '';
+            document.getElementById('manual-barcode').value = '';
+            startCamera();
+        }
 
+        // ===== PRINT =====
         function printDirect() {
-            const items = Object.values(printQueue); if (!items.length) { toast('Queue empty'); return; }
-            let printFrame = document.getElementById('print-frame'); if (!printFrame) { printFrame = document.createElement('iframe'); printFrame.id = 'print-frame'; printFrame.style.cssText = 'position:absolute;top:-10000px;'; document.body.appendChild(printFrame); }
-            const doc = printFrame.contentWindow.document; let html = `<!DOCTYPE html><html><head><title>Print</title><style>@page{size:A4;margin:0}body{margin:0;font-family:Arial}.labels-grid{display:grid;grid-template-columns:repeat(3,70mm);grid-template-rows:repeat(6,45mm);gap:0}.label{width:70mm;height:45mm;padding:2mm;text-align:center;display:flex;flex-direction:column;justify-content:center;align-items:center;page-break-inside:avoid;gap:0}.price{font-size:18pt;font-weight:900;line-height:1}.name{font-size:12pt;font-weight:bold;text-transform:uppercase;line-height:1;max-width:66mm}.barcode-img svg{max-width:62mm}.barcode-number{font-size:7pt}</style><script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script></head><body><div class="labels-grid">`;
-            let bcIndex = 0; const barcodeData = [];
-            items.forEach(item => { for (let i = 0; i < item.qty; i++) { html += `<div class="label"><div class="price">$${item.price.toFixed(2)}</div><div class="name">${item.name.toUpperCase()}</div><svg id="bc${bcIndex}" class="barcode-img"></svg><div class="barcode-number">${item.barcode}</div></div>`; barcodeData.push({ id: bcIndex, barcode: item.barcode }); bcIndex++; } });
-            html += '</div><script>'; barcodeData.forEach(bd => { html += `JsBarcode("#bc${bd.id}","${bd.barcode}",{width:1.5,height:18,displayValue:false,margin:1});`; }); html += 'setTimeout(()=>{window.print();},300);<\/script></body></html>';
-            doc.open(); doc.write(html); doc.close(); toast('Sending to printer...');
+            const items = Object.values(printQueue);
+            if (!items.length) { toast('Queue empty'); return; }
+            let printFrame = document.getElementById('print-frame');
+            if (!printFrame) { printFrame = document.createElement('iframe'); printFrame.id = 'print-frame'; printFrame.style.cssText = 'position:absolute;top:-10000px;'; document.body.appendChild(printFrame); }
+            const doc = printFrame.contentWindow.document;
+            let html = `<!DOCTYPE html><html><head><title>Print</title><style>@page{size:A4;margin:0}body{margin:0;font-family:Arial}.labels-grid{display:grid;grid-template-columns:repeat(3,70mm);grid-template-rows:repeat(6,45mm);gap:0}.label{width:70mm;height:45mm;padding:2mm;text-align:center;display:flex;flex-direction:column;justify-content:center;align-items:center;page-break-inside:avoid;gap:0}.price{font-size:18pt;font-weight:900;line-height:1}.name{font-size:12pt;font-weight:bold;text-transform:uppercase;line-height:1;max-width:66mm}.barcode-img svg{max-width:62mm}.barcode-number{font-size:7pt}</style><script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script></head><body><div class="labels-grid">`;
+            let bcIndex = 0;
+            const barcodeData = [];
+            items.forEach(item => {
+                for (let i = 0; i < item.qty; i++) {
+                    const safeName = escHtml(item.name.toUpperCase());
+                    const safeBarcode = escHtml(item.barcode);
+                    html += `<div class="label"><div class="price">$${item.price.toFixed(2)}</div><div class="name">${safeName}</div><svg id="bc${bcIndex}" class="barcode-img"></svg><div class="barcode-number">${safeBarcode}</div></div>`;
+                    barcodeData.push({ id: bcIndex, barcode: item.barcode });
+                    bcIndex++;
+                }
+            });
+            html += '</div><script>';
+            barcodeData.forEach(bd => {
+                const safeBc = escJs(bd.barcode);
+                html += `JsBarcode("#bc${bd.id}","${safeBc}",{width:1.5,height:18,displayValue:false,margin:1});`;
+            });
+            html += 'setTimeout(()=>{window.print();},300);<\/script></body></html>';
+            doc.open(); doc.write(html); doc.close();
+            toast('Sending to printer...');
         }
 
         function printLabels() {
-            const items = Object.values(printQueue); if (!items.length) { toast('Queue empty'); return; } const w = window.open('', '_blank');
+            const items = Object.values(printQueue);
+            if (!items.length) { toast('Queue empty'); return; }
+            const w = window.open('', '_blank');
             let html = `<!DOCTYPE html><html><head><title>Labels</title><style>@page{size:A4;margin:0}body{font-family:Arial;margin:0;padding:0}.header{padding:10px;background:#2563eb;color:white;display:flex;justify-content:space-between}.header button{background:white;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;font-weight:bold}.labels-grid{display:grid;grid-template-columns:repeat(3,70mm);grid-template-rows:repeat(6,45mm);gap:0}.label{width:70mm;height:45mm;padding:2mm;text-align:center;display:flex;flex-direction:column;justify-content:center;align-items:center;page-break-inside:avoid;border:1px dashed #ccc;gap:0}.price{font-size:18pt;font-weight:900;line-height:1}.name{font-size:12pt;font-weight:bold;text-transform:uppercase;line-height:1;max-width:66mm}.barcode-img svg{max-width:62mm}.barcode-number{font-size:7pt}@media print{.header{display:none}.label{border:none}}</style><script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script></head><body><div class="header"><h3>Labels Preview</h3><button onclick="window.close()">Back</button></div><div class="labels-grid">`;
-            let bcIndex = 0; const barcodeData = [];
-            items.forEach(item => { for (let i = 0; i < item.qty; i++) { html += `<div class="label"><div class="price">$${item.price.toFixed(2)}</div><div class="name">${item.name.toUpperCase()}</div><svg id="bc${bcIndex}" class="barcode-img"></svg><div class="barcode-number">${item.barcode}</div></div>`; barcodeData.push({ id: bcIndex, barcode: item.barcode }); bcIndex++; } });
-            html += '</div><script>'; barcodeData.forEach(bd => { html += `JsBarcode("#bc${bd.id}","${bd.barcode}",{width:1.5,height:18,displayValue:false,margin:1});`; }); html += `<\/script></body></html>`;
+            let bcIndex = 0;
+            const barcodeData = [];
+            items.forEach(item => {
+                for (let i = 0; i < item.qty; i++) {
+                    const safeName = escHtml(item.name.toUpperCase());
+                    const safeBarcode = escHtml(item.barcode);
+                    html += `<div class="label"><div class="price">$${item.price.toFixed(2)}</div><div class="name">${safeName}</div><svg id="bc${bcIndex}" class="barcode-img"></svg><div class="barcode-number">${safeBarcode}</div></div>`;
+                    barcodeData.push({ id: bcIndex, barcode: item.barcode });
+                    bcIndex++;
+                }
+            });
+            html += '</div><script>';
+            barcodeData.forEach(bd => {
+                const safeBc = escJs(bd.barcode);
+                html += `JsBarcode("#bc${bd.id}","${safeBc}",{width:1.5,height:18,displayValue:false,margin:1});`;
+            });
+            html += `<\/script></body></html>`;
             w.document.write(html); w.document.close();
         }
 
         function printList() {
-            const items = Object.values(printQueue); if (!items.length) { toast('Queue empty'); return; } let total = items.reduce((sum, i) => sum + (i.price * i.qty), 0);
+            const items = Object.values(printQueue);
+            if (!items.length) { toast('Queue empty'); return; }
+            let total = items.reduce((sum, i) => sum + (i.price * i.qty), 0);
             let html = '<html><head><title>List</title><style>body{font-family:Arial;padding:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background:#2563eb;color:white}.total{font-weight:bold;font-size:16px}</style></head><body><h2>Gulistan Print List</h2><table><tr><th>Barcode</th><th>Product</th><th>Price</th><th>Qty</th><th>Total</th></tr>';
-            items.forEach(item => { html += `<tr><td>${item.barcode}</td><td>${item.name}</td><td>$${item.price.toFixed(2)}</td><td>${item.qty}</td><td>$${(item.price*item.qty).toFixed(2)}</td></tr>`; });
+            items.forEach(item => {
+                html += `<tr><td>${escHtml(item.barcode)}</td><td>${escHtml(item.name)}</td><td>$${item.price.toFixed(2)}</td><td>${item.qty}</td><td>$${(item.price*item.qty).toFixed(2)}</td></tr>`;
+            });
             html += `<tr class="total"><td colspan="4">Grand Total</td><td>$${total.toFixed(2)}</td></tr></table></body></html>`;
             const w = window.open('', '_blank'); w.document.write(html); w.document.close(); w.print();
         }
 
-        function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2000); }
+        // ===== TOAST =====
+        function toast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.style.display = 'block';
+            setTimeout(() => t.style.display = 'none', 2000);
+        }
 
+        // ===== INIT =====
         document.addEventListener('DOMContentLoaded', () => {
             loadQueueFromStorage();
             updateQueue();
-            loadProductsFromFirebase(); // Primary loading logic from Cloud
+            loadProductsFromFirebase();
         });
     </script>
 </body>
