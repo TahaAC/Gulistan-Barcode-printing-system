@@ -86,11 +86,11 @@
             table { font-size: 0.85rem; table-layout: fixed; width: 100%; }
             th, td { padding: 0.5rem 0.4rem; vertical-align: middle; }
 
-            /* Fixed column widths so Action buttons always fit */
-            th:nth-child(1), td:nth-child(1) { width: 28%; word-wrap: break-word; overflow-wrap: break-word; white-space: normal; } /* Barcode */
-            th:nth-child(2), td:nth-child(2) { width: 30%; word-wrap: break-word; overflow-wrap: break-word; white-space: normal; } /* Product */
+            /* Fixed column widths so Action buttons always fit (3 buttons now) */
+            th:nth-child(1), td:nth-child(1) { width: 25%; word-wrap: break-word; overflow-wrap: break-word; white-space: normal; } /* Barcode */
+            th:nth-child(2), td:nth-child(2) { width: 28%; word-wrap: break-word; overflow-wrap: break-word; white-space: normal; } /* Product */
             th:nth-child(3), td:nth-child(3) { width: 15%; white-space: nowrap; } /* Price */
-            th:nth-child(4), td:nth-child(4) { width: 27%; text-align: right; } /* Action */
+            th:nth-child(4), td:nth-child(4) { width: 32%; text-align: right; } /* Action */
 
             .quick-add-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; } .quick-add-grid > div:first-child { grid-column: 1 / -1; } .quick-add-grid button:last-child { grid-column: 1 / -1; }
             .product-result .name { font-size: 1.1rem; } .product-result .price { font-size: 1.8rem; }
@@ -197,6 +197,7 @@
             <div class="form-group"><label>New Price ($)</label><input type="number" id="edit-price" step="0.01"></div>
             <div style="display:flex;gap:0.5rem;">
                 <button class="btn-primary" onclick="saveEdit()" style="flex:1;"><i class="fa-solid fa-save"></i> Save</button>
+                <button class="btn-danger" onclick="deleteFromEdit()" style="flex:0 0 auto;"><i class="fa-solid fa-trash"></i> Delete</button>
                 <button class="btn-secondary" onclick="closeEditModal()" style="flex:1;">Cancel</button>
             </div>
         </div>
@@ -245,13 +246,42 @@
             render();
         }
 
+        function setSyncStatus(state) {
+            const el = document.getElementById('sync-status');
+            el.classList.remove('synced');
+            if (state === 'saving') {
+                el.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+            } else if (state === 'synced') {
+                el.innerHTML = '<i class="fa-solid fa-cloud-check"></i> Synced';
+                el.classList.add('synced');
+            } else if (state === 'error') {
+                el.innerHTML = '<i class="fa-solid fa-cloud-exclamation"></i> Error';
+            }
+        }
+
         async function saveProductToFirebase(product) {
+            setSyncStatus('saving');
             try {
                 await db.collection('products').doc(product.barcode).set(product);
-                document.getElementById('sync-status').innerHTML = '<i class="fa-solid fa-cloud-check"></i> Synced';
+                setSyncStatus('synced');
+                return true;
             } catch(e) {
                 console.error('Failed to save to Firebase', e);
-                document.getElementById('sync-status').innerHTML = '<i class="fa-solid fa-cloud-exclamation"></i> Error';
+                setSyncStatus('error');
+                return false;
+            }
+        }
+
+        async function deleteProductFromFirebase(barcode) {
+            setSyncStatus('saving');
+            try {
+                await db.collection('products').doc(barcode).delete();
+                setSyncStatus('synced');
+                return true;
+            } catch(e) {
+                console.error('Failed to delete from Firebase', e);
+                setSyncStatus('error');
+                return false;
             }
         }
 
@@ -276,6 +306,7 @@
                         <div class="action-btns" style="justify-content:flex-end;">
                             <button class="btn-secondary btn-icon" data-action="edit" data-barcode="${escHtml(p.barcode)}" title="Edit Price"><i class="fa-solid fa-pen"></i></button>
                             <button class="btn-primary btn-icon" data-action="add" data-barcode="${escHtml(p.barcode)}" title="Add to Queue"><i class="fa-solid fa-plus"></i></button>
+                            <button class="btn-danger btn-icon" data-action="delete" data-barcode="${escHtml(p.barcode)}" title="Delete"><i class="fa-solid fa-trash"></i></button>
                         </div>
                     </td>`;
                 tbody.appendChild(tr);
@@ -301,6 +332,7 @@
             if (!barcode) return;
             if (btn.dataset.action === 'edit') { openEdit(barcode); }
             if (btn.dataset.action === 'add') { addQueue(barcode); }
+            if (btn.dataset.action === 'delete') { deleteProduct(barcode); }
         });
 
         // ===== SEARCH =====
@@ -393,20 +425,33 @@
         }
 
         // ===== ADD NEW PRODUCT =====
-        function addNewProduct() {
+        async function addNewProduct() {
             const barcode = document.getElementById('new-barcode').value.trim();
             const name = document.getElementById('new-name').value.trim();
             const price = parseFloat(document.getElementById('new-price').value);
             if (!barcode || !name || isNaN(price)) { toast('Fill all fields'); return; }
             const product = { barcode, name, price };
             inventory[barcode] = product;
-            saveProductToFirebase(product);
+            const saved = await saveProductToFirebase(product);
             addQueue(barcode);
             document.getElementById('new-barcode').value = '';
             document.getElementById('new-name').value = '';
             document.getElementById('new-price').value = '';
             render();
-            toast('Added & Synced: ' + name);
+            toast(saved ? 'Saved to database: ' + name : 'Saved locally (DB error): ' + name);
+        }
+
+        // ===== DELETE =====
+        async function deleteProduct(barcode) {
+            const p = inventory[barcode];
+            if (!p) return;
+            if (!confirm(`Delete "${p.name}" from database?`)) return;
+            delete printQueue[barcode];
+            delete inventory[barcode];
+            const deleted = await deleteProductFromFirebase(barcode);
+            saveQueueToStorage();
+            render(); updateQueue();
+            toast(deleted ? 'Deleted from database: ' + p.name : 'Deleted locally (DB error): ' + p.name);
         }
 
         // ===== EDIT =====
@@ -419,14 +464,20 @@
             document.getElementById('edit-modal').classList.add('active');
         }
         function closeEditModal() { document.getElementById('edit-modal').classList.remove('active'); }
-        function saveEdit() {
+        async function deleteFromEdit() {
+            const barcode = document.getElementById('edit-barcode').value;
+            closeEditModal();
+            await deleteProduct(barcode);
+        }
+        async function saveEdit() {
             const barcode = document.getElementById('edit-barcode').value;
             const price = parseFloat(document.getElementById('edit-price').value);
             if (inventory[barcode] && !isNaN(price)) {
                 inventory[barcode].price = price;
                 if (printQueue[barcode]) printQueue[barcode].price = price;
-                saveProductToFirebase(inventory[barcode]);
-                render(); updateQueue(); closeEditModal(); toast('Updated & Synced');
+                const saved = await saveProductToFirebase(inventory[barcode]);
+                render(); updateQueue(); closeEditModal();
+                toast(saved ? 'Updated & saved to database' : 'Updated locally (DB error)');
             }
         }
 
@@ -452,28 +503,56 @@
             scannerMode = 'search';
         }
 
+        let _scanLock = false; // prevents duplicate scans
+
         function startCamera() {
+            // Stop any previous scanner instance before creating a new one
+            if (html5QrCode) {
+                try { html5QrCode.stop(); } catch(e) {}
+                html5QrCode = null;
+            }
+            _scanLock = false;
             html5QrCode = new Html5Qrcode("reader");
-            const config = { fps: 120, qrbox: { width: 200, height: 100 } };
-            html5QrCode.start({ facingMode: "environment" }, config, (decodedText) => {
-                html5QrCode.stop().then(() => {
-                    document.getElementById('scanning-status').style.display = 'none';
-                    if (scannerMode === 'new-product') {
-                        document.getElementById('new-barcode').value = decodedText.trim();
-                        closeScanner();
-                        document.getElementById('new-name').focus();
-                        toast('Barcode scanned');
-                    } else {
-                        handleBarcode(decodedText);
-                    }
-                }).catch(err => {});
-            }, () => {}).then(() => {
+            // fps: 10 is the sweet spot — fast enough to detect quickly,
+            // low enough to keep the CPU free for actual decoding
+            const config = { fps: 10, qrbox: { width: 250, height: 150 }, aspectRatio: 1.0 };
+            html5QrCode.start(
+                { facingMode: "environment" },
+                config,
+                (decodedText) => {
+                    // Guard against duplicate rapid-fire callbacks
+                    if (_scanLock) return;
+                    _scanLock = true;
+                    html5QrCode.stop().then(() => {
+                        document.getElementById('scanning-status').style.display = 'none';
+                        if (scannerMode === 'new-product') {
+                            document.getElementById('new-barcode').value = decodedText.trim();
+                            closeScanner();
+                            document.getElementById('new-name').focus();
+                            toast('Barcode scanned');
+                        } else {
+                            handleBarcode(decodedText);
+                        }
+                    }).catch(err => { console.warn('Stop error:', err); });
+                },
+                () => {} // ignore missed-frame errors
+            ).then(() => {
                 document.getElementById('scanning-status').style.display = 'flex';
             }).catch(err => {
-                document.getElementById('reader').innerHTML = '<div style="padding:2rem;text-align:center;color:#fff;">Camera not available. Use manual entry.</div>';
+                console.error('Camera start error:', err);
+                document.getElementById('reader').innerHTML =
+                    '<div style="padding:2rem;text-align:center;color:#fff;">Camera not available. Use manual entry below.</div>';
             });
         }
-        function stopCamera() { if (html5QrCode && html5QrCode.isScanning) html5QrCode.stop().catch(err => {}); }
+        function stopCamera() {
+            _scanLock = false;
+            if (html5QrCode) {
+                if (html5QrCode.isScanning) {
+                    html5QrCode.stop().catch(err => {});
+                }
+                html5QrCode = null;
+            }
+        }
 
         function handleManualScan() {
             const barcode = document.getElementById('manual-barcode').value.trim();
@@ -555,14 +634,15 @@
                 </div>`;
         }
 
-        function saveScannedProduct(barcode) {
+        async function saveScannedProduct(barcode) {
             const name = document.getElementById('scan-new-name').value.trim();
             const price = parseFloat(document.getElementById('scan-new-price').value);
             if (!name || isNaN(price)) { toast('Enter name and price'); return; }
             const product = { barcode, name, price };
             inventory[barcode] = product;
-            saveProductToFirebase(product);
-            addQueue(barcode); render(); closeScanner(); toast('Saved & Synced: ' + name);
+            const saved = await saveProductToFirebase(product);
+            addQueue(barcode); render(); closeScanner();
+            toast(saved ? 'Saved to database: ' + name : 'Saved locally (DB error): ' + name);
         }
 
         function continueScanning() {
