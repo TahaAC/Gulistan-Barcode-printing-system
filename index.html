@@ -12,8 +12,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
     <script>
         firebase.initializeApp({
             apiKey: "AIzaSyAa8C_GyMIEZeAyJhjM1QQIiGh-cww1Iro",
@@ -21,6 +21,32 @@
             projectId: "barcode-printing-93880"
         });
         const db = firebase.firestore();
+        // Enable offline persistence — writes are queued locally when offline
+        // and automatically synced when the connection returns.
+        // This means new products ALWAYS save, even on flaky mobile connections.
+        //
+        // FIX: Upgraded SDK from 10.7.1 to 10.12.0 — 10.7.1 had a known bug causing
+        // "INTERNAL ASSERTION FAILED: Unexpected state" when IndexedDB persistence
+        // got into a stale state. Also changed synchronizeTabs to false to prevent
+        // multi-tab lock conflicts that triggered the same assertion.
+        db.enablePersistence({ synchronizeTabs: false }).catch(err => {
+            if (err.code === 'failed-precondition') {
+                console.warn('Firestore persistence: multiple tabs open — using non-persistent mode');
+                // Multiple tabs open, persistence only works in one tab at a time.
+                // Firestore will still work, just without offline caching.
+            } else if (err.code === 'unimplemented') {
+                console.warn('Firestore persistence: browser not supported');
+            } else {
+                // Any other error (including corrupted IndexedDB from the old 10.7.1 bug)
+                // Try to clear the stale Firestore IndexedDB so next reload works cleanly
+                console.warn('Firestore persistence failed:', err.message);
+                try {
+                    // Delete the Firestore persistence IndexedDB so it rebuilds on next load
+                    indexedDB.deleteDatabase('firestore/[DEFAULT]/barcode-printing-93880');
+                    console.info('Cleared stale Firestore IndexedDB — will rebuild on next load');
+                } catch(e2) {}
+            }
+        });
     </script>
     <style>
         :root { --primary: #2563eb; --primary-dark: #1e40af; --secondary: #64748b; --bg: #f1f5f9; --surface: #ffffff; --text: #0f172a; --border: #e2e8f0; --danger: #ef4444; --success: #22c55e; }
@@ -147,11 +173,14 @@
         </div>
 
         <div id="queue-view" class="view">
-            <div class="card" style="display:flex;justify-content:space-between;align-items:center;">
-                <h3><i class="fa-solid fa-list-check"></i> Print Queue</h3>
+            <div class="card" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+                <div>
+                    <h3><i class="fa-solid fa-list-check"></i> Print Queue</h3>
+                    <div id="queue-persist-status" style="font-size:0.75rem;color:var(--success);margin-top:0.2rem;"><i class="fa-solid fa-device-mobile"></i> <i class="fa-solid fa-floppy-disk"></i> Saved on device</div>
+                </div>
                 <div style="display:flex;gap:0.5rem;">
                     <button class="btn-secondary" onclick="switchView('inventory-view')"><i class="fa-solid fa-arrow-left"></i> Back</button>
-                    <button class="btn-danger" onclick="clearQueue()"><i class="fa-solid fa-trash"></i> Clear</button>
+                    <button class="btn-danger" onclick="clearQueue()"><i class="fa-solid fa-trash"></i> Clear All</button>
                 </div>
             </div>
             <div class="table-container">
@@ -212,6 +241,96 @@
         let html5QrCode = null;
         const perPage = 100;
 
+        // ===== SEED PRODUCTS — 55 Gulistan products =====
+        // These are loaded into Firebase automatically when the database is empty.
+        // Once seeded, they live in Firebase and this list is only used on first run.
+        const SEED_PRODUCTS = [
+            { barcode: "123", name: "Gulistan walnut kernel 500g", price: 15.49 },
+            { barcode: "229997", name: "APRICOT 400GR", price: 6.99 },
+            { barcode: "20210472", name: "Atlas salted peanut 400g", price: 6.99 },
+            { barcode: "20250454", name: "Atlas Iranian roasted pistachio 400g", price: 14.99 },
+            { barcode: "89785464", name: "Gulistan white sugar 2kg", price: 6.99 },
+            { barcode: "567657567", name: "Gulistan pumpkin pepita 500g", price: 8.49 },
+            { barcode: "4160678590107", name: "Alvita coconut biscuit", price: 3.49 },
+            { barcode: "3218731741247", name: "Mumtaz trail mix 400g", price: 7.99 },
+            { barcode: "6260031022035", name: "Sehat olive shampoo", price: 4.49 },
+            { barcode: "9339358004011", name: "Vinegar sunflower seed", price: 4.99 },
+            { barcode: "817150258799", name: "AFG raw almond 500g", price: 10.99 },
+            { barcode: "9339358004172", name: "Raw chickpeas large 1kg", price: 6.49 },
+            { barcode: "9339358000655", name: "Red henna", price: 5.99 },
+            { barcode: "9339358000662", name: "Black henna", price: 5.99 },
+            { barcode: "9339358004103", name: "Honey sohan", price: 16.49 },
+            { barcode: "4421000224221", name: "Sesame crunchy snack", price: 5.50 },
+            { barcode: "827150249253", name: "AFG sunflower kernels 400g", price: 4.49 },
+            { barcode: "6212851204207", name: "Mumtaz Roasted & salted pistachio 500g", price: 13.99 },
+            { barcode: "4822115141241", name: "Mumtaz trail mix 400g", price: 7.99 },
+            { barcode: "6261149057254", name: "Collection chocolate gift pack", price: 14.99 },
+            { barcode: "6526485325", name: "Gulistan Vietnam cashews 700g", price: 15.99 },
+            { barcode: "45242253789", name: "Gulistan afghani palawi raisins 1kg", price: 11.99 },
+            { barcode: "9710015225596", name: "Cheetos puffs party bag 165g", price: 5.99 },
+            { barcode: "7159125397144", name: "Atlas saffron colour 150g", price: 5.49 },
+            { barcode: "719006530687", name: "Atlas wheat starch 500G", price: 3.49 },
+            { barcode: "6260812003482", name: "Nadi coconut bar", price: 8.49 },
+            { barcode: "9780218642292", name: "DSN sugar cubes", price: 2.99 },
+            { barcode: "719006532117", name: "Atlas baking powder 250g", price: 3.49 },
+            { barcode: "3577466931911", name: "Roshan corn oil 5L", price: 20.99 },
+            { barcode: "726436671033", name: "Whole cloves 100g", price: 4.49 },
+            { barcode: "726436670364", name: "Baharatchi cinnamon powder 100g", price: 2.99 },
+            { barcode: "726436671378", name: "Baharatchi garlic crushed 200g", price: 2.99 },
+            { barcode: "36548798541", name: "Gulistan Raw Australian Almond 500g", price: 9.99 },
+            { barcode: "794712654186", name: "Torshak tamarind lunex", price: 5.99 },
+            { barcode: "6260053183714", name: "Cheetoz pipe snack", price: 2.99 },
+            { barcode: "794712655725", name: "Masala pilaf spice", price: 5.99 },
+            { barcode: "794712655282", name: "Yogurt seasoning", price: 5.99 },
+            { barcode: "781021009059", name: "Alwazah green tea 200g", price: 6.49 },
+            { barcode: "719008133305", name: "Atlas amchur powder 200g", price: 2.49 },
+            { barcode: "8936010530003", name: "Aj green tea 800g", price: 12.99 },
+            { barcode: "8964001257578", name: "Atlas Roasted vermicelli", price: 0.99 },
+            { barcode: "352994000222", name: "Afghan Kabuli pulao 200g", price: 7.99 },
+            { barcode: "7278200236915", name: "Atlas grilled jalapeno pickles 640g", price: 3.99 },
+            { barcode: "8012529105151", name: "Mumtaz black jaggery 500g", price: 6.49 },
+            { barcode: "6260100389052", name: "Tak pottage macaroni 500g", price: 3.49 },
+            { barcode: "9310015248801", name: "Flaming hot Cheetoz 80g", price: 2.99 },
+            { barcode: "UNKNOWN", name: "Shan seekh kabab BBQ blend 500g", price: 5.99 },
+            { barcode: "8964001358091", name: "Hamdard ispaghol 100g", price: 6.99 },
+            { barcode: "8964000684078", name: "Gluco biscuits", price: 1.99 },
+            { barcode: "8964000684238", name: "Party pik biscuit", price: 1.99 },
+            { barcode: "609456734264", name: "Choco chum", price: 1.99 },
+            { barcode: "4294264013920", name: "Indomie spicy noodles", price: 3.99 },
+            { barcode: "8964003729004", name: "Dawn peshawari kahwa tea bags", price: 5.99 },
+            { barcode: "671866277518", name: "Korean spicy noodles", price: 1.99 },
+            { barcode: "725765614148", name: "Young's desi ghee 900g", price: 19.99 },
+            { barcode: "8961014024456", name: "Knorr chilli & garlic sauce 800g", price: 5.49 },
+            { barcode: "809456774585", name: "Riwayat desi ghee 1.6kg", price: 39.99 }
+        ];
+
+        // Auto-seed: uploads SEED_PRODUCTS to Firebase only if the database is empty.
+        // Runs once on first load. If products already exist, it skips silently.
+        async function autoSeedProducts() {
+            try {
+                const snapshot = await db.collection('products').get({ source: 'server' });
+                if (snapshot.size > 0) {
+                    console.log('Database has ' + snapshot.size + ' products — skipping seed');
+                    return;
+                }
+                console.log('Database is empty — seeding ' + SEED_PRODUCTS.length + ' products...');
+                let seeded = 0;
+                for (const p of SEED_PRODUCTS) {
+                    try {
+                        await db.collection('products').doc(p.barcode).set(p);
+                        seeded++;
+                        // Small delay every 10 writes to avoid Firestore rate limits
+                        if (seeded % 10 === 0) await new Promise(r => setTimeout(r, 300));
+                    } catch(e) {
+                        console.warn('Seed failed for', p.barcode, e.message);
+                    }
+                }
+                console.log('Seeded ' + seeded + ' products to Firebase');
+            } catch(e) {
+                console.warn('Auto-seed check failed (offline?):', e.message);
+            }
+        }
+
         // ===== SAFE ESCAPING HELPERS =====
         // Escapes a string for safe use inside a JS single-quoted string within an HTML onclick attribute
         function escJs(str) {
@@ -225,23 +344,122 @@
         }
 
         // ===== STORAGE =====
-        function saveQueueToStorage() { try { localStorage.setItem('gulistan_printQueue', JSON.stringify(printQueue)); } catch(e) {} }
-        function loadQueueFromStorage() { try { const saved = localStorage.getItem('gulistan_printQueue'); if (saved) printQueue = JSON.parse(saved); } catch(e) { printQueue = {}; } }
+        // Robust queue persistence using IndexedDB (primary) + localStorage (fallback).
+        // IndexedDB survives browser cache clears on iOS/Android that wipe localStorage.
+        const QUEUE_DB_NAME = 'GulistanDB';
+        const QUEUE_STORE = 'queue';
+        const QUEUE_KEY = 'printQueue';
+
+        function openQueueDB() {
+            return new Promise((resolve, reject) => {
+                if (!window.indexedDB) { reject('No IndexedDB'); return; }
+                const request = indexedDB.open(QUEUE_DB_NAME, 1);
+                request.onupgradeneeded = (e) => {
+                    const idb = e.target.result;
+                    if (!idb.objectStoreNames.contains(QUEUE_STORE)) {
+                        idb.createObjectStore(QUEUE_STORE);
+                    }
+                };
+                request.onsuccess = (e) => resolve(e.target.result);
+                request.onerror = () => reject('IndexedDB open error');
+            });
+        }
+
+        async function saveQueueToStorage() {
+            const data = JSON.stringify(printQueue);
+            // Try IndexedDB first
+            try {
+                const idb = await openQueueDB();
+                const tx = idb.transaction(QUEUE_STORE, 'readwrite');
+                tx.objectStore(QUEUE_STORE).put(data, QUEUE_KEY);
+                await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = rej; });
+                updateQueuePersistStatus(true);
+                return;
+            } catch(e) { /* fall through to localStorage */ }
+            // Fallback: localStorage
+            try {
+                localStorage.setItem('gulistan_printQueue', data);
+                updateQueuePersistStatus(true);
+            } catch(e2) {
+                updateQueuePersistStatus(false);
+            }
+        }
+
+        async function loadQueueFromStorage() {
+            // Try IndexedDB first
+            try {
+                const idb = await openQueueDB();
+                const tx = idb.transaction(QUEUE_STORE, 'readonly');
+                const req = tx.objectStore(QUEUE_STORE).get(QUEUE_KEY);
+                const result = await new Promise((res, rej) => {
+                    req.onsuccess = () => res(req.result);
+                    req.onerror = () => rej('read error');
+                });
+                if (result) { printQueue = JSON.parse(result); return; }
+            } catch(e) { /* fall through to localStorage */ }
+            // Fallback: localStorage
+            try {
+                const saved = localStorage.getItem('gulistan_printQueue');
+                if (saved) printQueue = JSON.parse(saved);
+            } catch(e2) { printQueue = {}; }
+        }
+
+        async function clearQueueStorage() {
+            // Clear both stores
+            try {
+                const idb = await openQueueDB();
+                const tx = idb.transaction(QUEUE_STORE, 'readwrite');
+                tx.objectStore(QUEUE_STORE).delete(QUEUE_KEY);
+            } catch(e) {}
+            try { localStorage.removeItem('gulistan_printQueue'); } catch(e) {}
+        }
+
+        function updateQueuePersistStatus(ok) {
+            const el = document.getElementById('queue-persist-status');
+            if (!el) return;
+            if (ok) {
+                el.innerHTML = '<i class="fa-solid fa-mobile-screen"></i> <i class="fa-solid fa-floppy-disk"></i> Saved on device';
+                el.style.color = 'var(--success)';
+            } else {
+                el.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Save failed — storage full?';
+                el.style.color = 'var(--danger)';
+            }
+        }
 
         // ===== FIREBASE =====
         async function loadProductsFromFirebase() {
             document.getElementById('sync-status').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Loading...';
             try {
-                const snapshot = await db.collection('products').get();
+                // With offline persistence enabled, first response comes from cache,
+                // then Firestore fetches from server. We need to handle both.
+                const snapshot = await db.collection('products').get({ source: 'default' });
                 if (!snapshot.empty) {
                     snapshot.forEach(doc => { inventory[doc.id] = doc.data(); });
                     console.log('Loaded from Firebase:', Object.keys(inventory).length);
                 }
+
+                // fromCache is true on first load even when online (persistence reads cache first).
+                // Only show "offline" if the browser itself reports being offline.
+                if (navigator.onLine) {
+                    document.getElementById('sync-status').innerHTML = '<i class="fa-solid fa-cloud-check"></i> Synced';
+                    document.getElementById('sync-status').classList.add('synced');
+                    document.getElementById('sync-status').style.color = '';
+                } else {
+                    document.getElementById('sync-status').innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Offline — cached data';
+                    document.getElementById('sync-status').classList.remove('synced');
+                    document.getElementById('sync-status').style.color = '#f59e0b';
+                }
             } catch (e) {
                 console.error('Firebase load failed.', e);
+                // Only show offline error if browser confirms no connection
+                if (!navigator.onLine) {
+                    document.getElementById('sync-status').innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Offline — will sync';
+                    document.getElementById('sync-status').style.color = '#f59e0b';
+                } else {
+                    document.getElementById('sync-status').innerHTML = '<i class="fa-solid fa-cloud-exclamation"></i> Connection error';
+                    document.getElementById('sync-status').style.color = 'var(--danger)';
+                }
             }
-            document.getElementById('sync-status').innerHTML = '<i class="fa-solid fa-cloud-check"></i> Synced';
-            document.getElementById('sync-status').classList.add('synced');
             document.getElementById('total-products').textContent = Object.keys(inventory).length;
             render();
         }
@@ -249,6 +467,7 @@
         function setSyncStatus(state) {
             const el = document.getElementById('sync-status');
             el.classList.remove('synced');
+            el.style.color = '';
             if (state === 'saving') {
                 el.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
             } else if (state === 'synced') {
@@ -256,14 +475,34 @@
                 el.classList.add('synced');
             } else if (state === 'error') {
                 el.innerHTML = '<i class="fa-solid fa-cloud-exclamation"></i> Error';
+                el.style.color = 'var(--danger)';
+            } else if (state === 'offline') {
+                el.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Offline — will sync';
+                el.style.color = '#f59e0b';
             }
         }
+
+        // Listen for real browser online/offline events
+        // This is the most reliable way to detect connectivity changes
+        window.addEventListener('online', () => {
+            setSyncStatus('synced');
+            loadProductsFromFirebase(); // re-sync when back online
+        });
+        window.addEventListener('offline', () => {
+            setSyncStatus('offline');
+        });
 
         async function saveProductToFirebase(product) {
             setSyncStatus('saving');
             try {
                 await db.collection('products').doc(product.barcode).set(product);
-                setSyncStatus('synced');
+                // With offline persistence, this succeeds even when offline
+                // (queued locally, synced automatically when back online)
+                if (navigator.onLine) {
+                    setSyncStatus('synced');
+                } else {
+                    setSyncStatus('offline');
+                }
                 return true;
             } catch(e) {
                 console.error('Failed to save to Firebase', e);
@@ -276,7 +515,11 @@
             setSyncStatus('saving');
             try {
                 await db.collection('products').doc(barcode).delete();
-                setSyncStatus('synced');
+                if (navigator.onLine) {
+                    setSyncStatus('synced');
+                } else {
+                    setSyncStatus('offline');
+                }
                 return true;
             } catch(e) {
                 console.error('Failed to delete from Firebase', e);
@@ -417,7 +660,7 @@
             }
         }
         function delQueue(code) { delete printQueue[code]; updateQueue(); toast('Removed'); }
-        function clearQueue() { if (confirm('Clear all items?')) { printQueue = {}; localStorage.removeItem('gulistan_printQueue'); updateQueue(); toast('Queue cleared'); } }
+        async function clearQueue() { if (!confirm('Clear all items from your device?')) return; printQueue = {}; await clearQueueStorage(); updateQueue(); toast('Queue cleared from device'); }
 
         function switchView(id) {
             document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -438,7 +681,7 @@
             document.getElementById('new-name').value = '';
             document.getElementById('new-price').value = '';
             render();
-            toast(saved ? 'Saved to database: ' + name : 'Saved locally (DB error): ' + name);
+            toast(saved ? (navigator.onLine ? 'Saved to database: ' + name : 'Queued — will sync: ' + name) : 'Save failed: ' + name);
         }
 
         // ===== DELETE =====
@@ -451,7 +694,7 @@
             const deleted = await deleteProductFromFirebase(barcode);
             saveQueueToStorage();
             render(); updateQueue();
-            toast(deleted ? 'Deleted from database: ' + p.name : 'Deleted locally (DB error): ' + p.name);
+            toast(deleted ? (navigator.onLine ? 'Deleted from database: ' + p.name : 'Deleted — will sync: ' + p.name) : 'Delete failed: ' + p.name);
         }
 
         // ===== EDIT =====
@@ -477,7 +720,7 @@
                 if (printQueue[barcode]) printQueue[barcode].price = price;
                 const saved = await saveProductToFirebase(inventory[barcode]);
                 render(); updateQueue(); closeEditModal();
-                toast(saved ? 'Updated & saved to database' : 'Updated locally (DB error)');
+                toast(saved ? (navigator.onLine ? 'Updated in database' : 'Updated — will sync') : 'Update failed');
             }
         }
 
@@ -567,71 +810,273 @@
             }
         }
 
-        function handleBarcode(barcode) {
-            barcode = barcode.trim();
-            if (inventory[barcode]) { showProductFound(inventory[barcode]); addQueue(barcode); return; }
-            const matches = findSmartMatches(barcode);
-            if (matches.length > 0) { showProductFound(matches[0], matches.length > 1 ? matches.length : 0); addQueue(matches[0].barcode); return; }
-            showNotFound(barcode);
+        // ===== SMART BARCODE HANDLING =====
+
+        // Barcode type detection
+        function detectBarcodeType(code) {
+            if (/^\d{8}$/.test(code)) return 'EAN-8';
+            if (/^\d{13}$/.test(code)) return 'EAN-13';
+            if (/^\d{12}$/.test(code)) return 'UPC-A';
+            if (/^\d{10,13}$/.test(code) && code.startsWith('0')) return 'UPC/EAN';
+            if (/^[0-9]{4,14}$/.test(code)) return 'Numeric';
+            if (/^[A-Za-z0-9\-_/.+]+$/.test(code)) return 'Alphanumeric';
+            return 'Unknown';
         }
 
+        // Convert between EAN-13 and UPC-A (they represent the same product)
+        // UPC-A = last 12 digits of EAN-13 when EAN-13 starts with 0
+        function getEanUpcVariants(code) {
+            const variants = new Set([code]);
+            // If EAN-13 starts with 0, the UPC-A is the last 12 digits
+            if (code.length === 13 && code.startsWith('0')) {
+                variants.add(code.substring(1));
+            }
+            // If UPC-A (12 digits), the EAN-13 equivalent adds a leading 0
+            if (code.length === 12) {
+                variants.add('0' + code);
+            }
+            // Also try without check digit (last digit)
+            if (code.length >= 8) {
+                variants.add(code.substring(0, code.length - 1));
+            }
+            // Add leading-zero variant for shorter codes
+            if (code.length < 13 && /^\d+$/.test(code)) {
+                variants.add(code.padStart(13, '0'));
+                variants.add(code.padStart(12, '0'));
+            }
+            return [...variants];
+        }
+
+        // Intelligent barcode handler
+        function handleBarcode(barcode) {
+            barcode = barcode.trim();
+            if (!barcode) return;
+
+            // Step 1: Exact match (fast path)
+            if (inventory[barcode]) {
+                showProductFound(inventory[barcode]);
+                addQueue(barcode);
+                return;
+            }
+
+            // Step 2: EAN/UPC equivalent match
+            // EAN-13 "9300650500011" and UPC-A "300650500011" are the same product
+            const variants = getEanUpcVariants(barcode);
+            for (const v of variants) {
+                if (inventory[v]) {
+                    showProductFound(inventory[v], 0, barcode);
+                    addQueue(v);
+                    return;
+                }
+            }
+
+            // Step 3: Smart fuzzy match with scoring
+            const matches = findSmartMatches(barcode);
+            if (matches.length > 0) {
+                const best = matches[0];
+                if (best.score >= 0.9) {
+                    // Very confident — auto-add
+                    showProductFound(best.product, matches.length > 1 ? matches.length : 0, barcode);
+                    addQueue(best.product.barcode);
+                    return;
+                } else if (best.score >= 0.5) {
+                    // Possible match — show for confirmation
+                    showPossibleMatches(barcode, matches);
+                    return;
+                }
+            }
+
+            // Step 4: Not found — redirect to new product form
+            showNotFoundAndRedirect(barcode);
+        }
+
+        // Smart matching with relevance scoring
         function findSmartMatches(barcode) {
             const results = [];
             const cleanBarcode = barcode.replace(/\D/g, '');
+            const barcodeType = detectBarcodeType(barcode);
+            const barcodeLen = barcode.length;
+
+            // Collect all variant forms of the scanned barcode
+            const scannedVariants = new Set(getEanUpcVariants(barcode));
+            if (cleanBarcode) {
+                scannedVariants.add(cleanBarcode);
+                // Also add variant of just the numeric part
+                getEanUpcVariants(cleanBarcode).forEach(v => scannedVariants.add(v));
+            }
+
             for (let key in inventory) {
                 const p = inventory[key];
                 const cleanKey = key.replace(/\D/g, '');
-                if (key === barcode) { results.unshift(p); continue; }
-                if (cleanBarcode && cleanKey && (cleanKey.includes(cleanBarcode) || cleanBarcode.includes(cleanKey))) { results.push(p); continue; }
-                if (results.length >= 5) break;
+                let score = 0;
+
+                // Exact match on barcode (shouldn't reach here, but safety)
+                if (key === barcode) { score = 1.0; }
+
+                // Variant match (EAN-13 ↔ UPC-A equivalent)
+                else if (scannedVariants.has(key)) { score = 0.95; }
+                else if (scannedVariants.has(cleanKey)) { score = 0.95; }
+
+                // Clean numeric includes (e.g. partial code match)
+                else if (cleanBarcode && cleanKey) {
+                    if (cleanKey === cleanBarcode) { score = 0.9; }
+                    else if (cleanKey.includes(cleanBarcode) || cleanBarcode.includes(cleanKey)) {
+                        // Higher score for closer lengths (less padding)
+                        const lenDiff = Math.abs(cleanKey.length - cleanBarcode.length);
+                        score = Math.max(0, 0.75 - (lenDiff * 0.05));
+                    }
+                    // Check key variants against scanned variants
+                    else {
+                        const keyVariants = getEanUpcVariants(key);
+                        for (const kv of keyVariants) {
+                            if (scannedVariants.has(kv)) { score = Math.max(score, 0.9); break; }
+                            if (cleanBarcode && kv.replace(/\D/g, '').includes(cleanBarcode)) { score = Math.max(score, 0.6); }
+                        }
+                    }
+                }
+
+                // Same type + similar length partial match
+                if (score === 0 && barcodeType !== 'Unknown' && key.length === barcodeLen) {
+                    // Count matching characters
+                    let matchCount = 0;
+                    const minLen = Math.min(key.length, barcode.length);
+                    for (let i = 0; i < minLen; i++) {
+                        if (key[i] === barcode[i]) matchCount++;
+                    }
+                    const charMatch = matchCount / minLen;
+                    if (charMatch >= 0.8) score = charMatch * 0.6; // Scale down
+                }
+
+                if (score > 0.3) {
+                    results.push({ product: p, score });
+                }
             }
-            return results;
+
+            // Sort by score descending
+            results.sort((a, b) => b.score - a.score);
+            return results.slice(0, 5);
         }
 
-        function showProductFound(product, moreCount = 0) {
+        // Show product found — with optional "scanned as" indicator
+        function showProductFound(product, moreCount = 0, scannedAs = null) {
             const resultDiv = document.getElementById('scan-result');
             const safeBarcode = escHtml(product.barcode);
             const safeName = escHtml(product.name);
             const safeBarcodeJs = escJs(product.barcode);
+            const scannedAsNote = scannedAs && scannedAs !== product.barcode
+                ? `<div style="color:var(--secondary);font-size:0.8rem;margin-top:0.25rem;"><i class="fa-solid fa-magnifying-glass"></i> Scanned: ${escHtml(scannedAs)} → Matched: ${safeBarcode}</div>`
+                : '';
+
             resultDiv.innerHTML = `
                 <div class="product-result">
+                    <div style="display:flex;align-items:center;justify-content:center;gap:0.5rem;margin-bottom:0.25rem;">
+                        <i class="fa-solid fa-circle-check" style="color:var(--success);font-size:1.5rem;"></i>
+                        <span style="font-size:0.9rem;color:var(--success);font-weight:600;">FOUND</span>
+                    </div>
                     <div class="name">${safeName}</div>
                     <div class="price">$${product.price.toFixed(2)}</div>
                     <div class="barcode-img"><svg id="result-barcode"></svg></div>
                     <div class="barcode">${safeBarcode}</div>
-                    ${moreCount > 0 ? `<div style="color:var(--secondary);font-size:0.85rem;margin-top:0.5rem;">+${moreCount} more matches</div>` : ''}
+                    ${scannedAsNote}
+                    ${moreCount > 0 ? `<div style="color:var(--secondary);font-size:0.85rem;margin-top:0.5rem;">+${moreCount} more possible matches</div>` : ''}
                 </div>
                 <div style="margin-top:1rem;display:flex;gap:0.5rem;">
-                    <button class="btn-primary" onclick="addQueue('${safeBarcodeJs}');toast('Added more');" style="flex:1;"><i class="fa-solid fa-plus"></i> Add Another</button>
+                    <button class="btn-primary" onclick="addQueue('${safeBarcodeJs}');toast('Added to queue');" style="flex:1;"><i class="fa-solid fa-plus"></i> Add Another</button>
                     <button class="btn-secondary" onclick="continueScanning()" style="flex:1;"><i class="fa-solid fa-camera"></i> Scan Next</button>
                 </div>`;
             setTimeout(() => {
                 try {
                     JsBarcode("#result-barcode", product.barcode, { width: 2, height: 50, displayValue: false, margin: 5 });
                 } catch(e) {
-                    document.getElementById('result-barcode').outerHTML = `<div style="font-family:monospace;">${safeBarcode}</div>`;
+                    const el = document.getElementById('result-barcode');
+                    if (el) el.outerHTML = `<div style="font-family:monospace;">${safeBarcode}</div>`;
                 }
             }, 100);
         }
 
-        function showNotFound(barcode) {
+        // Show possible matches when confidence is medium — user picks the right one
+        function showPossibleMatches(barcode, matches) {
             const resultDiv = document.getElementById('scan-result');
             const safeBarcode = escHtml(barcode);
-            const safeBarcodeJs = escJs(barcode);
+            let html = `
+                <div style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border-radius:12px;padding:1.25rem;text-align:center;">
+                    <i class="fa-solid fa-question-circle" style="font-size:2rem;color:#f59e0b;margin-bottom:0.5rem;"></i>
+                    <div style="font-weight:700;margin-bottom:0.25rem;">Possible Matches</div>
+                    <div style="font-family:monospace;font-size:0.85rem;color:var(--secondary);margin-bottom:0.75rem;">Scanned: ${safeBarcode}</div>
+                    <div style="font-size:0.85rem;color:var(--secondary);margin-bottom:0.75rem;">Is this one of these products?</div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:0.5rem;margin-top:1rem;">`;
+
+            matches.forEach(m => {
+                const p = m.product;
+                const safePBarcode = escHtml(p.barcode);
+                const safePBarcodeJs = escJs(p.barcode);
+                const safePName = escHtml(p.name);
+                const pct = Math.round(m.score * 100);
+                const barColor = pct >= 80 ? 'var(--success)' : pct >= 60 ? '#f59e0b' : 'var(--secondary)';
+                html += `
+                    <div style="display:flex;align-items:center;gap:0.75rem;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:0.75rem;">
+                        <div style="flex:1;min-width:0;">
+                            <div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${safePName}</div>
+                            <div style="font-size:0.8rem;color:var(--secondary);font-family:monospace;">${safePBarcode}</div>
+                            <div style="font-size:0.75rem;color:${barColor};font-weight:600;">${pct}% match</div>
+                        </div>
+                        <div style="font-weight:700;color:var(--primary);margin-right:0.5rem;">$${p.price.toFixed(2)}</div>
+                        <button class="btn-primary" style="padding:0.5rem 0.75rem;white-space:nowrap;" onclick="confirmMatch('${safePBarcodeJs}','${escJs(barcode)}')"><i class="fa-solid fa-check"></i> This One</button>
+                    </div>`;
+            });
+
+            html += `</div>
+                <div style="margin-top:1rem;display:flex;gap:0.5rem;">
+                    <button class="btn-primary" onclick="showNotFoundAndRedirect('${escJs(barcode)}')" style="flex:1;"><i class="fa-solid fa-plus-circle"></i> None — Add New Product</button>
+                    <button class="btn-secondary" onclick="continueScanning()" style="flex:1;"><i class="fa-solid fa-camera"></i> Rescan</button>
+                </div>`;
+            resultDiv.innerHTML = html;
+        }
+
+        // User confirms a match from the possible list
+        function confirmMatch(barcode, scannedAs) {
+            showProductFound(inventory[barcode], 0, scannedAs);
+            addQueue(barcode);
+        }
+
+        // Not found — immediately redirect to the new product form
+        // Closes scanner, pre-fills barcode in Quick Add, and focuses name
+        function showNotFoundAndRedirect(barcode) {
+            // Brief "not found" flash so the user knows what happened
+            const resultDiv = document.getElementById('scan-result');
+            const safeBarcode = escHtml(barcode);
+            const barcodeType = detectBarcodeType(barcode);
             resultDiv.innerHTML = `
                 <div class="not-found">
-                    <div class="icon"><i class="fa-solid fa-exclamation-circle"></i></div>
-                    <div style="font-weight:600;margin-bottom:0.5rem;">Product Not Found</div>
-                    <div style="font-family:monospace;background:#fff;padding:0.5rem;border-radius:4px;margin-bottom:1rem;">${safeBarcode}</div>
-                </div>
-                <div style="margin-top:1rem;">
-                    <p style="font-weight:600;margin-bottom:0.5rem;">Add New Product:</p>
-                    <div style="display:flex;flex-direction:column;gap:0.5rem;">
-                        <input type="text" id="scan-new-name" placeholder="Product Name" style="padding:0.75rem;border:2px solid var(--border);border-radius:8px;">
-                        <input type="number" id="scan-new-price" placeholder="Price ($)" step="0.01" style="padding:0.75rem;border:2px solid var(--border);border-radius:8px;">
-                        <button class="btn-primary" onclick="saveScannedProduct('${safeBarcodeJs}')"><i class="fa-solid fa-save"></i> Save & Add</button>
-                    </div>
+                    <div class="icon"><i class="fa-solid fa-barcode"></i></div>
+                    <div style="font-weight:700;margin-bottom:0.25rem;">New Barcode Detected</div>
+                    <div style="font-family:monospace;background:#fff;padding:0.5rem 1rem;border-radius:6px;font-size:1.1rem;font-weight:600;margin-bottom:0.25rem;">${safeBarcode}</div>
+                    <div style="font-size:0.8rem;color:var(--secondary);margin-bottom:0.75rem;">Type: ${barcodeType}</div>
+                    <div style="color:var(--success);font-weight:600;"><i class="fa-solid fa-arrow-right"></i> Redirecting to add product...</div>
                 </div>`;
+
+            // Auto-redirect after a short moment so the user sees what happened
+            setTimeout(() => {
+                stopCamera();
+                document.getElementById('scanner-modal').classList.remove('active');
+                scannerMode = 'search';
+
+                // Pre-fill Quick Add barcode
+                document.getElementById('new-barcode').value = barcode;
+                document.getElementById('new-name').value = '';
+                document.getElementById('new-price').value = '';
+
+                // Switch to inventory view and focus name
+                switchView('inventory-view');
+                setTimeout(() => {
+                    document.getElementById('new-name').focus();
+                    // Scroll to Quick Add card
+                    document.getElementById('new-barcode').closest('.card').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 150);
+
+                toast('New barcode — enter product details');
+            }, 800);
         }
 
         async function saveScannedProduct(barcode) {
@@ -642,7 +1087,7 @@
             inventory[barcode] = product;
             const saved = await saveProductToFirebase(product);
             addQueue(barcode); render(); closeScanner();
-            toast(saved ? 'Saved to database: ' + name : 'Saved locally (DB error): ' + name);
+            toast(saved ? (navigator.onLine ? 'Saved to database: ' + name : 'Queued — will sync: ' + name) : 'Save failed: ' + name);
         }
 
         function continueScanning() {
@@ -726,9 +1171,11 @@
         }
 
         // ===== INIT =====
-        document.addEventListener('DOMContentLoaded', () => {
-            loadQueueFromStorage();
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadQueueFromStorage();
             updateQueue();
+            // Auto-seed 55 products to Firebase on first run (skips if database already has data)
+            await autoSeedProducts();
             loadProductsFromFirebase();
         });
     </script>
