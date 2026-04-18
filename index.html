@@ -304,11 +304,11 @@
     <div id="edit-modal" class="modal">
         <div class="modal-content">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
-                <h2>Edit Price</h2>
+                <h2>Edit Product</h2>
                 <button class="btn-secondary" onclick="closeEditModal()" style="padding:0.5rem;border-radius:50%;"><i class="fa-solid fa-times"></i></button>
             </div>
             <div class="form-group"><label>Barcode</label><input type="text" id="edit-barcode" readonly style="background:var(--bg);"></div>
-            <div class="form-group"><label>Product Name</label><input type="text" id="edit-name" readonly style="background:var(--bg);"></div>
+            <div class="form-group"><label>Product Name</label><input type="text" id="edit-name" style="border-color:var(--primary);"></div>
             <div class="form-group"><label>New Price ($)</label><input type="number" id="edit-price" step="0.01"></div>
             <div style="display:flex;gap:0.5rem;">
                 <button class="btn-primary" onclick="saveEdit()" style="flex:1;"><i class="fa-solid fa-save"></i> Save</button>
@@ -710,7 +710,11 @@
                     <td title="${escHtml(p.name)}">${escHtml(p.name)}</td>
                     <td class="price-tag">$${p.price.toFixed(2)}</td>
                     <td style="text-align:right;">
-                        <button class="btn-primary btn-icon" data-action="add" data-barcode="${escHtml(p.barcode)}" title="Add to Queue"><i class="fa-solid fa-plus"></i></button>
+                        <div class="action-btns" style="justify-content:flex-end;">
+                            <button class="btn-secondary btn-icon" data-action="edit" data-barcode="${escHtml(p.barcode)}" title="Edit"><i class="fa-solid fa-pen"></i></button>
+                            <button class="btn-primary btn-icon" data-action="add" data-barcode="${escHtml(p.barcode)}" title="Add to Queue"><i class="fa-solid fa-plus"></i></button>
+                            <button class="btn-danger btn-icon" data-action="delete" data-barcode="${escHtml(p.barcode)}" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                        </div>
                     </td>`;
                 tbody.appendChild(tr);
             });
@@ -822,13 +826,20 @@
         }
         async function saveEdit() {
             const barcode = document.getElementById('edit-barcode').value;
+            const newName = document.getElementById('edit-name').value.trim();
             const price = parseFloat(document.getElementById('edit-price').value);
-            if (inventory[barcode] && !isNaN(price)) {
+            if (inventory[barcode] && !isNaN(price) && newName) {
+                inventory[barcode].name = newName;
                 inventory[barcode].price = price;
-                if (printQueue[barcode]) printQueue[barcode].price = price;
+                if (printQueue[barcode]) {
+                    printQueue[barcode].name = newName;
+                    printQueue[barcode].price = price;
+                }
                 const saved = await saveProductToFirebase(inventory[barcode]);
                 render(); updateQueue(); closeEditModal();
                 toast(saved ? (navigator.onLine ? 'Updated in database' : 'Updated — will sync') : 'Update failed');
+            } else {
+                toast('Name and price are required');
             }
         }
 
