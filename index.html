@@ -23,24 +23,8 @@
         const db = firebase.firestore();
 
         // ===== PERSISTENCE SETUP =====
-        // Enable offline persistence — writes are queued locally when offline
-        // and automatically synced when the connection returns.
-        //
-        // FIX HISTORY:
-        // v1: SDK 10.7.1 had a bug causing "INTERNAL ASSERTION FAILED" with
-        //     corrupted IndexedDB. Used synchronizeTabs:false as workaround.
-        // v2: Upgraded to SDK 10.12.0 which fixed the assertion bug.
-        // v3: Changed synchronizeTabs:false → true (default) because false causes
-        //     exclusive locks that break when multiple tabs are open.
-        //     The deprecation warning for enablePersistence() is expected in 10.12.0 —
-        //     the API still works and will remain supported.
-        //
-        // Also handles "Tracking Prevention blocked access to storage" errors
-        // from Safari/Edge privacy features by checking storage access first.
-
         let _persistenceOk = false;
 
-        // Check if localStorage is accessible (Tracking Prevention may block it)
         function checkStorageAccess() {
             try {
                 localStorage.setItem('_gulistan_storage_test', '1');
@@ -49,7 +33,6 @@
             } catch(e) { return false; }
         }
 
-        // Check if IndexedDB is accessible (Tracking Prevention may block it)
         function checkIndexedDBAccess() {
             return new Promise(resolve => {
                 try {
@@ -69,9 +52,6 @@
             const idbOk = await checkIndexedDBAccess();
 
             if (!idbOk) {
-                console.warn('IndexedDB blocked by browser (Tracking Prevention / privacy mode).');
-                console.warn('App will work but data won\'t persist between sessions.');
-                console.warn('Fix: Add this site to your browser allowed list, or disable tracking prevention.');
                 showStorageWarning('IndexedDB blocked by browser — data won\'t persist. Add this site to your allowed list or disable tracking prevention.');
                 return;
             }
@@ -85,28 +65,20 @@
                 console.info('Firestore persistence enabled (multi-tab sync)');
             } catch(err) {
                 if (err.code === 'failed-precondition') {
-                    // Another tab has persistence with synchronizeTabs:false (exclusive lock)
-                    console.warn('Firestore persistence: another tab has exclusive access.');
-                    console.warn('Fix: Close ALL other tabs with this app, then reload this page.');
                     showStorageWarning('Multiple tabs open — close other tabs and reload for offline support.');
                     _persistenceOk = false;
                 } else if (err.code === 'unimplemented') {
-                    console.warn('Firestore persistence: browser does not support IndexedDB');
                     _persistenceOk = false;
                 } else {
-                    // Corrupted IndexedDB, Tracking Prevention, or other errors
-                    console.warn('Firestore persistence failed:', err.message);
                     showStorageWarning('Offline storage unavailable — app works online only. Try reloading.');
                     try {
                         indexedDB.deleteDatabase('firestore/[DEFAULT]/barcode-printing-93880');
-                        console.info('Cleared stale Firestore IndexedDB — will rebuild on next load');
                     } catch(e2) {}
                     _persistenceOk = false;
                 }
             }
         }
 
-        // Queue any warning message to show after DOM is ready
         let _pendingWarning = null;
 
         function showStorageWarning(msg) {
@@ -116,7 +88,6 @@
                 textEl.textContent = msg;
                 el.classList.add('active');
             } else {
-                // DOM not ready yet — queue it
                 _pendingWarning = msg;
             }
         }
@@ -173,29 +144,20 @@
         .storage-warning { background: #fef3c7; border-bottom: 2px solid #f59e0b; padding: 0.5rem 1rem; font-size: 0.85rem; display: none; align-items: center; justify-content: center; gap: 0.5rem; color: #92400e; }
         .storage-warning.active { display: flex; }
         .storage-warning button { background: #f59e0b; color: white; border: none; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.8rem; cursor: pointer; }
-
-        /* Action Buttons */
         .action-btns { display: flex; gap: 0.25rem; align-items: center; }
         .btn-icon { padding: 0.4rem; border-radius: 6px; font-size: 0.9rem; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
-
-        /* ====== MOBILE FIXES ====== */
         @media (max-width: 768px) {
             header { padding: 0.5rem; }
             .brand { font-size: 0.95rem; } .brand span { display: none; }
             .btn-scan span { display: none; } .btn-secondary span { display: none; }
             main { padding: 0.75rem; } .card { padding: 0.75rem; } .search-input { font-size: 16px; }
-
             .table-container { border-radius: 8px; }
-            /* KEY FIX: table-layout:fixed forces wrapping and prevents Action column from being pushed off */
             table { font-size: 0.85rem; table-layout: fixed; width: 100%; }
             th, td { padding: 0.5rem 0.4rem; vertical-align: middle; }
-
-            /* Fixed column widths so Action buttons always fit (3 buttons now) */
-            th:nth-child(1), td:nth-child(1) { width: 25%; word-wrap: break-word; overflow-wrap: break-word; white-space: normal; } /* Barcode */
-            th:nth-child(2), td:nth-child(2) { width: 28%; word-wrap: break-word; overflow-wrap: break-word; white-space: normal; } /* Product */
-            th:nth-child(3), td:nth-child(3) { width: 15%; white-space: nowrap; } /* Price */
-            th:nth-child(4), td:nth-child(4) { width: 32%; text-align: right; } /* Action */
-
+            th:nth-child(1), td:nth-child(1) { width: 25%; word-wrap: break-word; overflow-wrap: break-word; white-space: normal; }
+            th:nth-child(2), td:nth-child(2) { width: 28%; word-wrap: break-word; overflow-wrap: break-word; white-space: normal; }
+            th:nth-child(3), td:nth-child(3) { width: 15%; white-space: nowrap; }
+            th:nth-child(4), td:nth-child(4) { width: 32%; text-align: right; }
             .quick-add-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; } .quick-add-grid > div:first-child { grid-column: 1 / -1; } .quick-add-grid button:last-child { grid-column: 1 / -1; }
             .product-result .name { font-size: 1.1rem; } .product-result .price { font-size: 1.8rem; }
             button { padding: 0.5rem 0.75rem; font-size: 0.85rem; }
@@ -280,7 +242,6 @@
         </div>
     </main>
 
-    <!-- Scanner Modal -->
     <div id="scanner-modal" class="modal">
         <div class="modal-content">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
@@ -300,7 +261,6 @@
         </div>
     </div>
 
-    <!-- Edit Modal -->
     <div id="edit-modal" class="modal">
         <div class="modal-content">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
@@ -327,11 +287,9 @@
         let html5QrCode = null;
         const perPage = 100;
 
-        // ===== SEED PRODUCTS — 57 Gulistan products =====
-        // These are loaded into Firebase automatically — any product not yet in the database
-        // will be added. Products that already exist are skipped (no overwrites).
+        // ===== UPDATED SEED PRODUCTS =====
         const SEED_PRODUCTS = [
-            { barcode: "123", name: "Gulistan walnut kernel 500g", price: 15.49 },
+            { barcode: "123", name: "Walnut Kernel 500g", price: 15.49 },
             { barcode: "229997", name: "APRICOT 400GR", price: 6.99 },
             { barcode: "20210472", name: "Atlas salted peanut 400g", price: 6.99 },
             { barcode: "20250454", name: "Atlas Iranian roasted pistachio 400g", price: 14.99 },
@@ -360,8 +318,8 @@
             { barcode: "9780218642292", name: "DSN sugar cubes", price: 2.99 },
             { barcode: "719006532117", name: "Atlas baking powder 250g", price: 3.49 },
             { barcode: "3577466931911", name: "Roshan corn oil 5L", price: 20.99 },
-            { barcode: "726436671033", name: "Whole cloves 100g", price: 4.49 },
-            { barcode: "726436670364", name: "Baharatchi cinnamon powder 100g", price: 2.99 },
+            { barcode: "726436671033", name: "Whole cloves 100g", price: 4.50 },
+            { barcode: "726436670364", name: "Baharatchi cinnamon powder 100g", price: 3.00 },
             { barcode: "726436671378", name: "Baharatchi garlic crushed 200g", price: 2.99 },
             { barcode: "36548798541", name: "Gulistan Raw Australian Almond 500g", price: 9.99 },
             { barcode: "794712654186", name: "Torshak tamarind lunex", price: 5.99 },
@@ -387,12 +345,22 @@
             { barcode: "671866277518", name: "Korean spicy noodles", price: 1.99 },
             { barcode: "725765614148", name: "Young's desi ghee 900g", price: 19.99 },
             { barcode: "8961014024456", name: "Knorr chilli & garlic sauce 800g", price: 5.49 },
-            { barcode: "809456774585", name: "Riwayat desi ghee 1.6kg", price: 39.99 }
+            { barcode: "809456774585", name: "Riwayat desi ghee 1.6kg", price: 39.99 },
+            // --- Newly Added Products ---
+            { barcode: "01203520185177", name: "Gulistan Green Cardamom 1kg", price: 119.99 },
+            { barcode: "09555052070026", name: "Hecham Corn Oil 20L", price: 69.99 },
+            { barcode: "2012120612917", name: "Usb Wall Charger", price: 11.99 },
+            { barcode: "3256761107305", name: "La Vache De Paris Butter Ghee", price: 13.99 },
+            { barcode: "4897008639129", name: "Medicom Vitals L 100gloves", price: 9.99 },
+            { barcode: "6158506068612", name: "Ahlam Al Arab Air Freshenr 300ml", price: 6.50 },
+            { barcode: "7126648871796", name: "Premium Palestine Dates 5kg", price: 109.99 },
+            { barcode: "719006530052", name: "Atlas Turmeric 100g", price: 1.99 },
+            { barcode: "719006532117", name: "Atlas Baking Powder 250g", price: 3.49 },
+            { barcode: "7278200236915", name: "Atlas Grilled Jalapeno Pickles 640g", price: 3.99 },
+            { barcode: "827150247853", name: "SUGAR ALMOND 800GR", price: 10.99 },
+            { barcode: "827150249253", name: "AFG sunflower kernels 400g", price: 4.49 }
         ];
 
-        // Auto-seed: uploads SEED_PRODUCTS to Firebase, adding only products that
-        // don't already exist. This way new products added to SEED_PRODUCTS will be
-        // automatically pushed to Firebase on next app load, without overwriting existing data.
         async function autoSeedProducts() {
             try {
                 const snapshot = await db.collection('products').get({ source: 'default' });
@@ -410,7 +378,6 @@
                     try {
                         await db.collection('products').doc(p.barcode).set(p);
                         seeded++;
-                        // Small delay every 10 writes to avoid Firestore rate limits
                         if (seeded % 10 === 0) await new Promise(r => setTimeout(r, 300));
                     } catch(e) {
                         console.warn('Seed failed for', p.barcode, e.message);
@@ -424,13 +391,11 @@
             }
         }
 
-        // Manual sync: user can click the "Sync" button to force-push any missing products to Firebase
         async function syncSeedProducts() {
             toast('Syncing products to database...');
             const result = await autoSeedProducts();
             if (result > 0) {
                 toast(result + ' new products synced!');
-                // Reload inventory from Firebase to include the newly synced products
                 await loadProductsFromFirebase();
             } else if (result === 0) {
                 toast('All products already in database');
@@ -439,21 +404,9 @@
             }
         }
 
-        // ===== SAFE ESCAPING HELPERS =====
-        // Escapes a string for safe use inside a JS single-quoted string within an HTML onclick attribute
-        function escJs(str) {
-            return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
-        }
-        // Escapes a string for safe use as HTML text content (prevents XSS)
-        function escHtml(str) {
-            const d = document.createElement('div');
-            d.textContent = String(str);
-            return d.innerHTML;
-        }
+        function escJs(str) { return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r'); }
+        function escHtml(str) { const d = document.createElement('div'); d.textContent = String(str); return d.innerHTML; }
 
-        // ===== STORAGE =====
-        // Robust queue persistence using IndexedDB (primary) + localStorage (fallback).
-        // IndexedDB survives browser cache clears on iOS/Android that wipe localStorage.
         const QUEUE_DB_NAME = 'GulistanDB';
         const QUEUE_STORE = 'queue';
         const QUEUE_KEY = 'printQueue';
@@ -475,7 +428,6 @@
 
         async function saveQueueToStorage() {
             const data = JSON.stringify(printQueue);
-            // Try IndexedDB first
             try {
                 const idb = await openQueueDB();
                 const tx = idb.transaction(QUEUE_STORE, 'readwrite');
@@ -483,8 +435,7 @@
                 await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = rej; });
                 updateQueuePersistStatus(true);
                 return;
-            } catch(e) { /* fall through to localStorage */ }
-            // Fallback: localStorage
+            } catch(e) {}
             try {
                 localStorage.setItem('gulistan_printQueue', data);
                 updateQueuePersistStatus(true);
@@ -494,7 +445,6 @@
         }
 
         async function loadQueueFromStorage() {
-            // Try IndexedDB first
             try {
                 const idb = await openQueueDB();
                 const tx = idb.transaction(QUEUE_STORE, 'readonly');
@@ -504,8 +454,7 @@
                     req.onerror = () => rej('read error');
                 });
                 if (result) { printQueue = JSON.parse(result); return; }
-            } catch(e) { /* fall through to localStorage */ }
-            // Fallback: localStorage
+            } catch(e) {}
             try {
                 const saved = localStorage.getItem('gulistan_printQueue');
                 if (saved) printQueue = JSON.parse(saved);
@@ -513,7 +462,6 @@
         }
 
         async function clearQueueStorage() {
-            // Clear both stores
             try {
                 const idb = await openQueueDB();
                 const tx = idb.transaction(QUEUE_STORE, 'readwrite');
@@ -534,20 +482,14 @@
             }
         }
 
-        // ===== FIREBASE =====
         async function loadProductsFromFirebase() {
             document.getElementById('sync-status').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Loading...';
             try {
-                // With offline persistence enabled, first response comes from cache,
-                // then Firestore fetches from server. We need to handle both.
                 const snapshot = await db.collection('products').get({ source: 'default' });
                 if (!snapshot.empty) {
                     snapshot.forEach(doc => { inventory[doc.id] = doc.data(); });
                     console.log('Loaded from Firebase:', Object.keys(inventory).length);
                 }
-
-                // fromCache is true on first load even when online (persistence reads cache first).
-                // Only show "offline" if the browser itself reports being offline.
                 if (navigator.onLine) {
                     document.getElementById('sync-status').innerHTML = '<i class="fa-solid fa-cloud-check"></i> Synced';
                     document.getElementById('sync-status').classList.add('synced');
@@ -558,8 +500,6 @@
                     document.getElementById('sync-status').style.color = '#f59e0b';
                 }
             } catch (e) {
-                console.error('Firebase load failed.', e);
-                // Only show offline error if browser confirms no connection
                 if (!navigator.onLine) {
                     document.getElementById('sync-status').innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Offline — will sync';
                     document.getElementById('sync-status').style.color = '#f59e0b';
@@ -576,44 +516,22 @@
             const el = document.getElementById('sync-status');
             el.classList.remove('synced');
             el.style.color = '';
-            if (state === 'saving') {
-                el.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
-            } else if (state === 'synced') {
-                el.innerHTML = '<i class="fa-solid fa-cloud-check"></i> Synced';
-                el.classList.add('synced');
-            } else if (state === 'error') {
-                el.innerHTML = '<i class="fa-solid fa-cloud-exclamation"></i> Error';
-                el.style.color = 'var(--danger)';
-            } else if (state === 'offline') {
-                el.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Offline — will sync';
-                el.style.color = '#f59e0b';
-            }
+            if (state === 'saving') el.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+            else if (state === 'synced') { el.innerHTML = '<i class="fa-solid fa-cloud-check"></i> Synced'; el.classList.add('synced'); }
+            else if (state === 'error') { el.innerHTML = '<i class="fa-solid fa-cloud-exclamation"></i> Error'; el.style.color = 'var(--danger)'; }
+            else if (state === 'offline') { el.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Offline — will sync'; el.style.color = '#f59e0b'; }
         }
 
-        // Listen for real browser online/offline events
-        // This is the most reliable way to detect connectivity changes
-        window.addEventListener('online', () => {
-            setSyncStatus('synced');
-            loadProductsFromFirebase(); // re-sync when back online
-        });
-        window.addEventListener('offline', () => {
-            setSyncStatus('offline');
-        });
+        window.addEventListener('online', () => { setSyncStatus('synced'); loadProductsFromFirebase(); });
+        window.addEventListener('offline', () => { setSyncStatus('offline'); });
 
         async function saveProductToFirebase(product) {
             setSyncStatus('saving');
             try {
                 await db.collection('products').doc(product.barcode).set(product);
-                // With offline persistence, this succeeds even when offline
-                // (queued locally, synced automatically when back online)
-                if (navigator.onLine) {
-                    setSyncStatus('synced');
-                } else {
-                    setSyncStatus('offline');
-                }
+                if (navigator.onLine) setSyncStatus('synced'); else setSyncStatus('offline');
                 return true;
             } catch(e) {
-                console.error('Failed to save to Firebase', e);
                 setSyncStatus('error');
                 return false;
             }
@@ -623,20 +541,14 @@
             setSyncStatus('saving');
             try {
                 await db.collection('products').doc(barcode).delete();
-                if (navigator.onLine) {
-                    setSyncStatus('synced');
-                } else {
-                    setSyncStatus('offline');
-                }
+                if (navigator.onLine) setSyncStatus('synced'); else setSyncStatus('offline');
                 return true;
             } catch(e) {
-                console.error('Failed to delete from Firebase', e);
                 setSyncStatus('error');
                 return false;
             }
         }
 
-        // ===== RENDER PRODUCT TABLE =====
         function render() {
             const tbody = document.getElementById('product-list');
             const products = Object.values(inventory);
@@ -647,7 +559,6 @@
 
             show.forEach(p => {
                 const tr = document.createElement('tr');
-                // Use data-barcode on the row so event delegation can find it
                 tr.dataset.barcode = p.barcode;
                 tr.innerHTML = `
                     <td title="${escHtml(p.barcode)}">${escHtml(p.barcode)}</td>
@@ -675,7 +586,6 @@
             }
         }
 
-        // ===== EVENT DELEGATION for product table =====
         document.addEventListener('click', function(e) {
             const btn = e.target.closest('[data-action]');
             if (!btn) return;
@@ -686,7 +596,6 @@
             if (btn.dataset.action === 'delete') { deleteProduct(barcode); }
         });
 
-        // ===== SEARCH =====
         function handleSearch() {
             const q = document.getElementById('search-input').value.toLowerCase().trim();
             if (!q) { currentPage = 1; render(); return; }
@@ -721,7 +630,6 @@
             document.getElementById('showing-products').textContent = show.length;
         }
 
-        // ===== QUEUE =====
         function addQueue(barcode) {
             const p = inventory[barcode];
             if (!p) return;
@@ -756,7 +664,6 @@
             saveQueueToStorage();
         }
 
-        // Event delegation for queue buttons
         document.addEventListener('click', function(e) {
             const btn = e.target.closest('[data-action="chgqty"]');
             if (btn) { chgQty(btn.dataset.barcode, parseInt(btn.dataset.delta)); return; }
@@ -779,7 +686,6 @@
             document.getElementById(id).classList.add('active');
         }
 
-        // ===== ADD NEW PRODUCT =====
         async function addNewProduct() {
             const barcode = document.getElementById('new-barcode').value.trim();
             const name = document.getElementById('new-name').value.trim();
@@ -796,7 +702,6 @@
             toast(saved ? (navigator.onLine ? 'Saved to database: ' + name : 'Queued — will sync: ' + name) : 'Save failed: ' + name);
         }
 
-        // ===== DELETE =====
         async function deleteProduct(barcode) {
             const p = inventory[barcode];
             if (!p) return;
@@ -809,7 +714,6 @@
             toast(deleted ? (navigator.onLine ? 'Deleted from database: ' + p.name : 'Deleted — will sync: ' + p.name) : 'Delete failed: ' + p.name);
         }
 
-        // ===== EDIT =====
         function openEdit(barcode) {
             const p = inventory[barcode];
             if (!p) return;
@@ -843,7 +747,6 @@
             }
         }
 
-        // ===== SCANNER =====
         let scannerMode = 'search';
         function openScanner() {
             scannerMode = 'search';
@@ -865,24 +768,20 @@
             scannerMode = 'search';
         }
 
-        let _scanLock = false; // prevents duplicate scans
+        let _scanLock = false;
 
         function startCamera() {
-            // Stop any previous scanner instance before creating a new one
             if (html5QrCode) {
                 try { html5QrCode.stop(); } catch(e) {}
                 html5QrCode = null;
             }
             _scanLock = false;
             html5QrCode = new Html5Qrcode("reader");
-            // fps: 10 is the sweet spot — fast enough to detect quickly,
-            // low enough to keep the CPU free for actual decoding
             const config = { fps: 10, qrbox: { width: 250, height: 150 }, aspectRatio: 1.0 };
             html5QrCode.start(
                 { facingMode: "environment" },
                 config,
                 (decodedText) => {
-                    // Guard against duplicate rapid-fire callbacks
                     if (_scanLock) return;
                     _scanLock = true;
                     html5QrCode.stop().then(() => {
@@ -897,7 +796,7 @@
                         }
                     }).catch(err => { console.warn('Stop error:', err); });
                 },
-                () => {} // ignore missed-frame errors
+                () => {}
             ).then(() => {
                 document.getElementById('scanning-status').style.display = 'flex';
             }).catch(err => {
@@ -929,9 +828,6 @@
             }
         }
 
-        // ===== SMART BARCODE HANDLING =====
-
-        // Barcode type detection
         function detectBarcodeType(code) {
             if (/^\d{8}$/.test(code)) return 'EAN-8';
             if (/^\d{13}$/.test(code)) return 'EAN-13';
@@ -942,23 +838,17 @@
             return 'Unknown';
         }
 
-        // Convert between EAN-13 and UPC-A (they represent the same product)
-        // UPC-A = last 12 digits of EAN-13 when EAN-13 starts with 0
         function getEanUpcVariants(code) {
             const variants = new Set([code]);
-            // If EAN-13 starts with 0, the UPC-A is the last 12 digits
             if (code.length === 13 && code.startsWith('0')) {
                 variants.add(code.substring(1));
             }
-            // If UPC-A (12 digits), the EAN-13 equivalent adds a leading 0
             if (code.length === 12) {
                 variants.add('0' + code);
             }
-            // Also try without check digit (last digit)
             if (code.length >= 8) {
                 variants.add(code.substring(0, code.length - 1));
             }
-            // Add leading-zero variant for shorter codes
             if (code.length < 13 && /^\d+$/.test(code)) {
                 variants.add(code.padStart(13, '0'));
                 variants.add(code.padStart(12, '0'));
@@ -966,20 +856,16 @@
             return [...variants];
         }
 
-        // Intelligent barcode handler
         function handleBarcode(barcode) {
             barcode = barcode.trim();
             if (!barcode) return;
 
-            // Step 1: Exact match (fast path)
             if (inventory[barcode]) {
                 showProductFound(inventory[barcode]);
                 addQueue(barcode);
                 return;
             }
 
-            // Step 2: EAN/UPC equivalent match
-            // EAN-13 "9300650500011" and UPC-A "300650500011" are the same product
             const variants = getEanUpcVariants(barcode);
             for (const v of variants) {
                 if (inventory[v]) {
@@ -989,38 +875,31 @@
                 }
             }
 
-            // Step 3: Smart fuzzy match with scoring
             const matches = findSmartMatches(barcode);
             if (matches.length > 0) {
                 const best = matches[0];
                 if (best.score >= 0.9) {
-                    // Very confident — auto-add
                     showProductFound(best.product, matches.length > 1 ? matches.length : 0, barcode);
                     addQueue(best.product.barcode);
                     return;
                 } else if (best.score >= 0.5) {
-                    // Possible match — show for confirmation
                     showPossibleMatches(barcode, matches);
                     return;
                 }
             }
 
-            // Step 4: Not found — redirect to new product form
             showNotFoundAndRedirect(barcode);
         }
 
-        // Smart matching with relevance scoring
         function findSmartMatches(barcode) {
             const results = [];
             const cleanBarcode = barcode.replace(/\D/g, '');
             const barcodeType = detectBarcodeType(barcode);
             const barcodeLen = barcode.length;
 
-            // Collect all variant forms of the scanned barcode
             const scannedVariants = new Set(getEanUpcVariants(barcode));
             if (cleanBarcode) {
                 scannedVariants.add(cleanBarcode);
-                // Also add variant of just the numeric part
                 getEanUpcVariants(cleanBarcode).forEach(v => scannedVariants.add(v));
             }
 
@@ -1029,23 +908,15 @@
                 const cleanKey = key.replace(/\D/g, '');
                 let score = 0;
 
-                // Exact match on barcode (shouldn't reach here, but safety)
                 if (key === barcode) { score = 1.0; }
-
-                // Variant match (EAN-13 ↔ UPC-A equivalent)
                 else if (scannedVariants.has(key)) { score = 0.95; }
                 else if (scannedVariants.has(cleanKey)) { score = 0.95; }
-
-                // Clean numeric includes (e.g. partial code match)
                 else if (cleanBarcode && cleanKey) {
                     if (cleanKey === cleanBarcode) { score = 0.9; }
                     else if (cleanKey.includes(cleanBarcode) || cleanBarcode.includes(cleanKey)) {
-                        // Higher score for closer lengths (less padding)
                         const lenDiff = Math.abs(cleanKey.length - cleanBarcode.length);
                         score = Math.max(0, 0.75 - (lenDiff * 0.05));
-                    }
-                    // Check key variants against scanned variants
-                    else {
+                    } else {
                         const keyVariants = getEanUpcVariants(key);
                         for (const kv of keyVariants) {
                             if (scannedVariants.has(kv)) { score = Math.max(score, 0.9); break; }
@@ -1054,16 +925,14 @@
                     }
                 }
 
-                // Same type + similar length partial match
                 if (score === 0 && barcodeType !== 'Unknown' && key.length === barcodeLen) {
-                    // Count matching characters
                     let matchCount = 0;
                     const minLen = Math.min(key.length, barcode.length);
                     for (let i = 0; i < minLen; i++) {
                         if (key[i] === barcode[i]) matchCount++;
                     }
                     const charMatch = matchCount / minLen;
-                    if (charMatch >= 0.8) score = charMatch * 0.6; // Scale down
+                    if (charMatch >= 0.8) score = charMatch * 0.6;
                 }
 
                 if (score > 0.3) {
@@ -1071,12 +940,10 @@
                 }
             }
 
-            // Sort by score descending
             results.sort((a, b) => b.score - a.score);
             return results.slice(0, 5);
         }
 
-        // Show product found — with optional "scanned as" indicator
         function showProductFound(product, moreCount = 0, scannedAs = null) {
             const resultDiv = document.getElementById('scan-result');
             const safeBarcode = escHtml(product.barcode);
@@ -1113,7 +980,6 @@
             }, 100);
         }
 
-        // Show possible matches when confidence is medium — user picks the right one
         function showPossibleMatches(barcode, matches) {
             const resultDiv = document.getElementById('scan-result');
             const safeBarcode = escHtml(barcode);
@@ -1153,16 +1019,12 @@
             resultDiv.innerHTML = html;
         }
 
-        // User confirms a match from the possible list
         function confirmMatch(barcode, scannedAs) {
             showProductFound(inventory[barcode], 0, scannedAs);
             addQueue(barcode);
         }
 
-        // Not found — immediately redirect to the new product form
-        // Closes scanner, pre-fills barcode in Quick Add, and focuses name
         function showNotFoundAndRedirect(barcode) {
-            // Brief "not found" flash so the user knows what happened
             const resultDiv = document.getElementById('scan-result');
             const safeBarcode = escHtml(barcode);
             const barcodeType = detectBarcodeType(barcode);
@@ -1175,22 +1037,18 @@
                     <div style="color:var(--success);font-weight:600;"><i class="fa-solid fa-arrow-right"></i> Redirecting to add product...</div>
                 </div>`;
 
-            // Auto-redirect after a short moment so the user sees what happened
             setTimeout(() => {
                 stopCamera();
                 document.getElementById('scanner-modal').classList.remove('active');
                 scannerMode = 'search';
 
-                // Pre-fill Quick Add barcode
                 document.getElementById('new-barcode').value = barcode;
                 document.getElementById('new-name').value = '';
                 document.getElementById('new-price').value = '';
 
-                // Switch to inventory view and focus name
                 switchView('inventory-view');
                 setTimeout(() => {
                     document.getElementById('new-name').focus();
-                    // Scroll to Quick Add card
                     document.getElementById('new-barcode').closest('.card').scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }, 150);
 
@@ -1215,7 +1073,6 @@
             startCamera();
         }
 
-        // ===== PRINT =====
         function printDirect() {
             const items = Object.values(printQueue);
             if (!items.length) { toast('Queue empty'); return; }
@@ -1281,7 +1138,6 @@
             const w = window.open('', '_blank'); w.document.write(html); w.document.close(); w.print();
         }
 
-        // ===== TOAST =====
         function toast(msg) {
             const t = document.getElementById('toast');
             t.textContent = msg;
@@ -1289,9 +1145,7 @@
             setTimeout(() => t.style.display = 'none', 2000);
         }
 
-        // ===== INIT =====
         document.addEventListener('DOMContentLoaded', async () => {
-            // Show any pending storage warning that was queued before DOM was ready
             if (typeof _pendingWarning === 'string' && _pendingWarning) {
                 showStorageWarning(_pendingWarning);
                 _pendingWarning = null;
@@ -1299,10 +1153,8 @@
 
             await loadQueueFromStorage();
             updateQueue();
-            // Auto-seed products to Firebase — adds any missing products each load
             const seedResult = await autoSeedProducts();
             if (seedResult > 0) {
-                // New products were seeded, reload to include them in inventory
                 console.log(seedResult + ' products seeded — reloading inventory');
             }
             loadProductsFromFirebase();
